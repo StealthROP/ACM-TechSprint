@@ -16,6 +16,7 @@ import { TabBar } from '../components/TabBar';
 import { ProfileModal } from '../components/ProfileModal';
 import { getImageAsset } from '../theme/images';
 import { Feather } from '@expo/vector-icons';
+import { MOCK_LESSONS_BY_ID } from '../services/mockApi';
 
 export const DashboardScreen: React.FC = () => {
   const {
@@ -32,6 +33,12 @@ export const DashboardScreen: React.FC = () => {
     totalAttempts,
     sessionStartTime,
     highlightColor,
+    selectedMaterialId,
+    dynamicLessons,
+    moduleProgress,
+    cardDifficulty,
+    setSelectedMaterialId,
+    setActiveReaderTab,
   } = useA11yStore();
 
   const theme = THEMES[themeType];
@@ -71,6 +78,102 @@ export const DashboardScreen: React.FC = () => {
     green: '#2E8B57',
   };
   const activeHighlightColor = highlightColors[highlightColor] || theme.accent;
+
+  // 1. Resolve Last Studied Material
+  const activeMaterialId = selectedMaterialId || 'cell_biology'; // fallback to first mock
+  const activeMaterial = dynamicLessons[activeMaterialId] || MOCK_LESSONS_BY_ID[activeMaterialId] || MOCK_LESSONS_BY_ID['cell_biology'];
+  
+  const activeProgress = moduleProgress[activeMaterialId] || { currentCardIndex: 0, progressPct: 0 };
+  const activeProgressPct = Math.round(activeProgress.progressPct);
+
+  // 2. Generate AI study recommendations based on stats and card difficulty levels
+  const recommendation = useMemo(() => {
+    const totalCards = activeMaterial.flashcards?.length || 0;
+    
+    // Count difficulties for active deck
+    let easyCount = 0;
+    let mediumCount = 0;
+    let hardCount = 0;
+    let masteredCount = 0;
+
+    if (activeMaterial.flashcards) {
+      activeMaterial.flashcards.forEach((card, index) => {
+        const lang = 'en'; // default english checking
+        const key = `${activeMaterialId}_${lang}_${index}`;
+        const level = cardDifficulty[key] || 'easy';
+        if (level === 'easy') easyCount++;
+        else if (level === 'medium') mediumCount++;
+        else if (level === 'hard') hardCount++;
+        else if (level === 'mastered') masteredCount++;
+      });
+    }
+
+    // Recommendation rules engine
+    if (Object.keys(dynamicLessons).length === 0) {
+      return {
+        title: "Scan your first Textbook Page!",
+        desc: "Make your study materials personalized. Head to the 'Import' tab to scan textbook pages, upload PDF files, or snap photos, and let BelongED create interactive flashcards for you.",
+        icon: "camera" as const,
+        actionLabel: "Try Scanner",
+        targetScreen: "import" as const,
+        readerTab: undefined,
+      };
+    }
+
+    if (activeProgressPct > 0 && activeProgressPct < 100) {
+      return {
+        title: `Finish studying "${activeMaterial.document_title}"`,
+        desc: `You've completed ${activeProgressPct}% of this module. Let's finish the remaining cards to unlock active recall quizzes!`,
+        icon: "book-open" as const,
+        actionLabel: "Resume Reading",
+        targetScreen: "reader" as const,
+        readerTab: "review" as const,
+      };
+    }
+
+    if (accuracyPct > 0 && accuracyPct < 65) {
+      return {
+        title: "Try MCQ Adaptive Practice",
+        desc: `Your quiz accuracy is currently ${accuracyPct}%. Practice with Multiple Choice Questions (Easy Mode) on "${activeMaterial.document_title}" to build stronger base memory!`,
+        icon: "check-circle" as const,
+        actionLabel: "Practice Now",
+        targetScreen: "reader" as const,
+        readerTab: "flashcard" as const,
+      };
+    }
+
+    if (easyCount > 0 && masteredCount < totalCards / 2) {
+      return {
+        title: "Drill with Typing Hints",
+        desc: `You have ${easyCount} cards at Level 1 (Easy). Elevate them to Level 2 (Medium) by practicing Typing Mode with hints!`,
+        icon: "edit-2" as const,
+        actionLabel: "Start Typing Drill",
+        targetScreen: "reader" as const,
+        readerTab: "flashcard" as const,
+      };
+    }
+
+    if (hardCount > 0) {
+      return {
+        title: "Test with Active Recall Voice",
+        desc: `You have ${hardCount} cards ready at Level 3 (Hard). Challenge yourself using spoken answer checking to master this deck!`,
+        icon: "mic" as const,
+        actionLabel: "Start Voice Test",
+        targetScreen: "reader" as const,
+        readerTab: "flashcard" as const,
+      };
+    }
+
+    // Default recommendation
+    return {
+      title: `Practice Active Recall on "${activeMaterial.document_title}"`,
+      desc: "Regular active recall trains your brain to retrieve info. Run an Adaptive Drill to strengthen memory paths.",
+      icon: "zap" as const,
+      actionLabel: "Review Module",
+      targetScreen: "reader" as const,
+      readerTab: "review" as const,
+    };
+  }, [activeMaterial, activeMaterialId, cardDifficulty, dynamicLessons, activeProgressPct, accuracyPct]);
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
@@ -175,6 +278,79 @@ export const DashboardScreen: React.FC = () => {
                 );
               })}
             </View>
+          </View>
+        </View>
+
+        {/* ── Resume Study Module ── */}
+        <View style={[styles.sectionCard, { backgroundColor: theme.cardBackground }]}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Resume Study</Text>
+            <Text style={[styles.progressText, { color: theme.accent }]}>{activeProgressPct}% Complete</Text>
+          </View>
+          
+          <View style={styles.resumeBody}>
+            <View style={styles.resumeInfo}>
+              <Text style={[styles.resumeTitle, { color: theme.textPrimary }]} numberOfLines={1}>
+                {activeMaterial.document_title}
+              </Text>
+              <Text style={[styles.resumeSubtitle, { color: theme.textSecondary }]}>
+                Last studied at card {activeProgress.currentCardIndex + 1}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.resumeBtn, { backgroundColor: theme.accent }]}
+              activeOpacity={0.8}
+              onPress={() => {
+                setSelectedMaterialId(activeMaterialId);
+                setActiveScreen('reader');
+              }}
+            >
+              <Feather name="play" size={12} color="#fff" style={{ marginRight: 4 }} />
+              <Text style={styles.resumeBtnText}>Resume</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Progress Bar Track */}
+          <View style={styles.progressBarTrack}>
+            <View style={[styles.progressBarFill, { width: `${activeProgressPct}%`, backgroundColor: theme.accent }]} />
+          </View>
+        </View>
+
+        {/* ── AI Recommendation Card ── */}
+        <View style={[styles.recommendationCard, { backgroundColor: theme.cardBackground }]}>
+          <View style={styles.recommendationHeader}>
+            <View style={[styles.aiBadge, { backgroundColor: 'rgba(62, 142, 126, 0.08)' }]}>
+              <Feather name="cpu" size={14} color={theme.accent} />
+            </View>
+            <Text style={[styles.recommendationTitle, { color: theme.textPrimary }]}>AI Study Assistant</Text>
+          </View>
+          
+          <View style={styles.recommendationBody}>
+            <Text style={[styles.recTitleText, { color: theme.textPrimary }]}>
+              {recommendation.title}
+            </Text>
+            <Text style={[styles.recDescText, { color: theme.textSecondary }]}>
+              {recommendation.desc}
+            </Text>
+            
+            <TouchableOpacity
+              style={[styles.recActionBtn, { borderColor: theme.accent }]}
+              activeOpacity={0.85}
+              onPress={() => {
+                if (recommendation.targetScreen === 'reader') {
+                  setSelectedMaterialId(activeMaterialId);
+                  if (recommendation.readerTab) {
+                    setActiveReaderTab(recommendation.readerTab);
+                  }
+                }
+                setActiveScreen(recommendation.targetScreen);
+              }}
+            >
+              <Text style={[styles.recActionText, { color: theme.accent }]}>
+                {recommendation.actionLabel}
+              </Text>
+              <Feather name="arrow-right" size={12} color={theme.accent} style={{ marginLeft: 6 }} />
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -460,5 +636,138 @@ const styles = StyleSheet.create({
   statText: {
     fontSize: 12.5,
     lineHeight: 17,
+  },
+  sectionCard: {
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.03)',
+    width: '100%',
+    maxWidth: 600,
+    alignSelf: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.02,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  progressText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+  },
+  resumeBody: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 12,
+  },
+  resumeInfo: {
+    flex: 1,
+  },
+  resumeTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  resumeSubtitle: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  resumeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+  },
+  resumeBtnText: {
+    color: '#fff',
+    fontSize: 12.5,
+    fontWeight: '700',
+  },
+  progressBarTrack: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(0,0,0,0.04)',
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  recommendationCard: {
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.03)',
+    width: '100%',
+    maxWidth: 600,
+    alignSelf: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.02,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  recommendationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  aiBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  recommendationTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  recommendationBody: {
+    marginTop: 2,
+  },
+  recTitleText: {
+    fontSize: 16,
+    fontWeight: '800',
+    marginBottom: 6,
+    lineHeight: 22,
+  },
+  recDescText: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 16,
+    fontWeight: '500',
+  },
+  recActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    borderWidth: 1.2,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: 'transparent',
+  },
+  recActionText: {
+    fontSize: 12.5,
+    fontWeight: '800',
   },
 });
