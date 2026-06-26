@@ -1,27 +1,19 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { Text } from './A11yText';
 import { useA11yStore, ScreenType } from '../store/useA11yStore';
 import { THEMES } from '../theme/themes';
+import { Feather } from '@expo/vector-icons';
 
 export const TabBar: React.FC = () => {
-  const { activeScreen, setActiveScreen, themeType, highlightColor } = useA11yStore();
+  const { activeScreen, setActiveScreen, themeType } = useA11yStore();
   const theme = THEMES[themeType];
 
-  const tabs: { type: ScreenType; label: string; icon: string }[] = [
-    { type: 'home', label: 'Home', icon: '🏠' },
-    { type: 'library', label: 'Library', icon: '📚' },
-    { type: 'camera', label: 'Scan & Import', icon: '📷' },
+  const tabs: { type: ScreenType; label: string; icon: keyof typeof Feather.glyphMap }[] = [
+    { type: 'home', label: 'Home', icon: 'home' },
+    { type: 'library', label: 'Library', icon: 'book-open' },
+    { type: 'import', label: 'Scan & Import', icon: 'camera' },
   ];
-
-  // Map user-selected highlight color to hex codes
-  const highlightColors: Record<string, string> = {
-    theme: theme.accent,
-    orange: '#F27A1A',
-    teal: '#139A8C',
-    purple: '#8A2BE2',
-    green: '#2E8B57',
-  };
-  const activeHighlightColor = highlightColors[highlightColor] || theme.accent;
 
   const handleTabPress = (type: ScreenType) => {
     setActiveScreen(type);
@@ -32,7 +24,7 @@ export const TabBar: React.FC = () => {
       style={[
         styles.tabBarContainer,
         {
-          backgroundColor: theme.cardBackground,
+          backgroundColor: theme.tabBarBg || theme.cardBackground,
           borderColor: themeType === 'dark' ? '#333' : '#EAE6DB',
         },
       ]}
@@ -42,13 +34,11 @@ export const TabBar: React.FC = () => {
         
         // Highlight pill background
         const pillBg = isSelected
-          ? themeType === 'dark'
-            ? 'rgba(255,255,255,0.08)'
-            : '#E5EFFC' // Soft light blue/grey pill
+          ? theme.tabActiveBg || (themeType === 'dark' ? 'rgba(255,255,255,0.08)' : '#E5EFFC')
           : 'transparent';
 
         const textColor = isSelected
-          ? activeHighlightColor
+          ? theme.tabActiveIcon || theme.accent
           : theme.textSecondary;
 
         return (
@@ -59,9 +49,12 @@ export const TabBar: React.FC = () => {
             activeOpacity={0.7}
           >
             <View style={[styles.pill, { backgroundColor: pillBg }]}>
-              <Text style={[styles.tabIcon, { color: textColor }]}>
-                {tab.icon}
-              </Text>
+              <Feather
+                name={tab.icon}
+                size={18}
+                color={textColor}
+                style={styles.tabIcon as any}
+              />
               <Text
                 style={[
                   styles.tabLabel,
@@ -111,8 +104,7 @@ const styles = StyleSheet.create({
     minWidth: 70,
   },
   tabIcon: {
-    fontSize: 18,
-    marginBottom: 2,
+    marginBottom: 4,
   },
   tabLabel: {
     fontSize: 10.5,

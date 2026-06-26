@@ -2,78 +2,104 @@ import React, { useState } from 'react';
 import {
   StyleSheet,
   View,
-  Text,
   TextInput,
   TouchableOpacity,
   ScrollView,
   SafeAreaView,
   Platform,
   StatusBar,
+  Text as RNText,
+  Image,
 } from 'react-native';
+import { Text } from '../components/A11yText';
 import { useA11yStore } from '../store/useA11yStore';
 import { THEMES } from '../theme/themes';
+import { MOCK_LESSONS_BY_ID, LessonMaterial } from '../services/mockApi';
 import { TabBar } from '../components/TabBar';
+import { ShareNoteModal } from '../components/ShareNoteModal';
+import { getImageAsset } from '../theme/images';
+import { Feather } from '@expo/vector-icons';
 
 export const LibraryScreen: React.FC = () => {
-  const { themeType, setActiveScreen, highlightColor, setSelectedMaterialId } = useA11yStore();
+  const {
+    themeType,
+    setActiveScreen,
+    setSelectedMaterialId,
+    moduleProgress,
+    setActiveReaderTab,
+    dynamicLessons,
+    fontFamily,
+  } = useA11yStore();
   const theme = THEMES[themeType];
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'review' | 'import' | 'flashcard'>('all');
 
-  // Map user-selected highlight color to hex codes
-  const highlightColors: Record<string, string> = {
-    theme: theme.accent,
-    orange: '#F27A1A',
-    teal: '#139A8C',
-    purple: '#8A2BE2',
-    green: '#2E8B57',
-  };
-  const activeHighlightColor = highlightColors[highlightColor] || theme.accent;
+  const [isShareModalVisible, setIsShareModalVisible] = useState(false);
+  const [selectedShareTitle, setSelectedShareTitle] = useState('');
+  const [selectedShareSubtitle, setSelectedShareSubtitle] = useState('');
+  const [selectedSharePayload, setSelectedSharePayload] = useState<LessonMaterial | null>(null);
+
+  // Cognitive style determination for dynamic assets
+  const cognitiveStyle = fontFamily === 'OpenDyslexic' ? 'dyslexic' : 'standard';
+
+  const dynamicItems = Object.keys(dynamicLessons || {}).map(id => {
+    const lesson = dynamicLessons[id];
+    return {
+      id: id,
+      title: lesson.document_title || 'Imported Lesson',
+      summary: lesson.raw_text ? lesson.raw_text.substring(0, 80) + '...' : 'Generated lesson.',
+      wordCount: `${lesson.review_points?.length || 0} Points`,
+      grade: 'SOCS005',
+      progress: 0.0,
+      type: 'import',
+    };
+  });
 
   const libraryItems = [
+    ...dynamicItems,
     {
       id: 'photo',
-      title: 'Ch. 4: Photosynthesis & Energy',
-      summary: 'Learn about chloroplasts, light-dependent reactions, and the Calvin cycle.',
+      title: 'Module 1',
+      summary: 'Learn about the life, works, and contributions of Dr. Jose Rizal, the Philippine national hero. This module explores his writings, ideas, and role in inspiring the movement for Philippine independence.',
       wordCount: '450 words',
-      grade: 'Biology 101',
-      progress: 0.75,
+      grade: 'SOCS005',
+      progress: 0.22,
       type: 'review',
+    },
+    {
+      id: 'mitosis',
+      title: 'Module 2',
+      summary: 'Breaking down replication phases (prophase, metaphase, anaphase, telophase) of cell cycles, with simplified vocabulary builder.',
+      wordCount: '580 words',
+      grade: 'BIO101',
+      progress: 0.43,
+      type: 'flashcard',
     },
     {
       id: 'neuro',
       title: 'Neurodiversity & Learning',
       summary: 'An introductory overview on reading modes, dyslexia, and ADHD accommodations.',
       wordCount: '320 words',
-      grade: 'A11y Study',
-      progress: 0.30,
+      grade: 'A11Y101',
+      progress: 0.72,
       type: 'import',
     },
     {
-      id: 'mitosis',
-      title: 'Ch. 5: Mitosis & Cell Cycles',
-      summary: 'Breaking down replication phases (prophase, metaphase, anaphase, telophase).',
-      wordCount: '580 words',
-      grade: 'Biology 101',
-      progress: 0.0,
-      type: 'flashcard',
-    },
-    {
       id: 'respiration',
-      title: 'Ch. 6: Cellular Respiration Quiz',
+      title: 'Cellular Respiration Quiz',
       summary: 'Practice flashcards on glycolysis, the Krebs cycle, and electron transport.',
       wordCount: '24 flashcards',
-      grade: 'Biology 101',
+      grade: 'BIO101',
       progress: 1.0,
       type: 'flashcard',
     },
     {
       id: 'plant_anatomy',
-      title: 'PDF Upload: Plant Anatomy',
+      title: 'Plant Anatomy Notes',
       summary: 'Imported PDF lecture notes outlining xylem, phloem, and root systems.',
       wordCount: '890 words',
-      grade: 'Botany 200',
+      grade: 'BOT200',
       progress: 0.15,
       type: 'import',
     },
@@ -82,7 +108,7 @@ export const LibraryScreen: React.FC = () => {
       title: 'Filipino Phonetics & Reading',
       summary: 'Core reading rules for Filipino syllables, highlighting digraphs and diphthongs.',
       wordCount: '620 words',
-      grade: 'A11y Study',
+      grade: 'FIL102',
       progress: 0.90,
       type: 'review',
     },
@@ -111,31 +137,38 @@ export const LibraryScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        
-        {/* Title */}
-        <View style={styles.header}>
-          <Text style={[styles.headerSubtitle, { color: activeHighlightColor }]}>STUDY CARDS</Text>
-          <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>Your Library</Text>
+      
+      {/* Header Banner - Full Width HeaderBg */}
+      <View style={[styles.headerBanner, { backgroundColor: theme.headerBg || theme.accent }]}>
+        <View style={styles.headerTopRow}>
+          <Text style={styles.headerTitle}>Your Library</Text>
+          <Image
+            source={getImageAsset('libraryHeader', cognitiveStyle)}
+            style={styles.headerBookIcon as any}
+            resizeMode="contain"
+          />
         </View>
 
-        {/* Search Bar */}
-        <View style={[styles.searchBarContainer, { backgroundColor: theme.cardBackground }]}>
-          <Text style={styles.searchIcon}>🔍</Text>
+        {/* Embedded Search Bar */}
+        <View style={styles.searchBarContainer}>
+          <Feather name="search" size={16} color="#999999" style={styles.searchIcon as any} />
           <TextInput
-            style={[styles.searchInput, { color: theme.textPrimary }]}
-            placeholder="Search cards, grades, keywords..."
-            placeholderTextColor={themeType === 'dark' ? '#666' : '#999'}
+            style={styles.searchInput}
+            placeholder="Search..."
+            placeholderTextColor="#999999"
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
           {searchQuery !== '' && (
             <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Text style={[styles.searchClearText, { color: theme.textSecondary }]}>✕</Text>
+              <Feather name="x" size={16} color="#999999" style={styles.searchClearText as any} />
             </TouchableOpacity>
           )}
         </View>
+      </View>
 
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        
         {/* Filter Categories Horizontal Scroll */}
         <ScrollView
           horizontal
@@ -151,13 +184,13 @@ export const LibraryScreen: React.FC = () => {
           ].map((filter) => {
             const isSelected = selectedFilter === filter.key;
             const filterBg = isSelected
-              ? activeHighlightColor
+              ? (theme.headerBg || theme.accent)
               : theme.cardBackground;
             const filterText = isSelected
               ? '#ffffff'
               : theme.textPrimary;
             const filterBorder = isSelected
-              ? activeHighlightColor
+              ? (theme.headerBg || theme.accent)
               : themeType === 'dark'
               ? '#333'
               : '#EAE6DB';
@@ -186,13 +219,13 @@ export const LibraryScreen: React.FC = () => {
         {/* List of items */}
         {filteredItems.length === 0 ? (
           <View style={[styles.emptyCard, { backgroundColor: theme.cardBackground }]}>
-            <Text style={styles.emptyCardIcon}>🔎</Text>
+            <Feather name="search" size={40} color={theme.textSecondary} style={{ marginBottom: 12 }} />
             <Text style={[styles.emptyCardTitle, { color: theme.textPrimary }]}>No Cards Found</Text>
             <Text style={[styles.emptyCardSubtitle, { color: theme.textSecondary }]}>
               Try adjusting your spelling or reset the categories to view all materials.
             </Text>
             <TouchableOpacity
-              style={[styles.resetBtn, { backgroundColor: activeHighlightColor }]}
+              style={[styles.resetBtn, { backgroundColor: theme.accent }]}
               onPress={() => {
                 setSearchQuery('');
                 setSelectedFilter('all');
@@ -203,58 +236,116 @@ export const LibraryScreen: React.FC = () => {
           </View>
         ) : (
           <View style={styles.listContainer}>
-            {filteredItems.map((item) => (
+            {filteredItems.map((item) => {
+              const progressData = moduleProgress[item.id];
+              const displayProgress = progressData ? progressData.progressPct : item.progress;
+
+              return (
               <TouchableOpacity
                 key={item.id}
-                style={[styles.card, { backgroundColor: theme.cardBackground }]}
+                style={[styles.card, { backgroundColor: theme.moduleCardBg || theme.cardBackground }]}
                 onPress={() => handleItemPress(item.id)}
                 activeOpacity={0.8}
               >
-                <View style={styles.cardHeader}>
-                  <Text style={[styles.cardGrade, { color: activeHighlightColor }]}>{item.grade}</Text>
-                  <Text style={[styles.cardWords, { color: theme.textSecondary }]}>{item.wordCount}</Text>
-                </View>
-                
-                <Text style={[styles.cardTitle, { color: theme.textPrimary }]}>{item.title}</Text>
-                <Text style={[styles.cardSummary, { color: theme.textSecondary }]}>{item.summary}</Text>
-                
-                {/* Aesthetic Progress Bar */}
-                <View style={styles.progressContainer}>
-                  <View style={styles.progressBarInfo}>
-                    <View style={styles.statusBadgeRow}>
-                      <Text style={styles.statusBadgeIcon}>
-                        {item.progress === 0 ? '💤' : item.progress === 1 ? '✅' : '📖'}
+                <View style={styles.cardMainRow}>
+                  {/* Guy Thinking Illustration on the Left */}
+                  <Image
+                    source={getImageAsset('guyThinkingModule', cognitiveStyle)}
+                    style={styles.cardImage as any}
+                    resizeMode="contain"
+                  />
+
+                  {/* Text Contents on the Right */}
+                  <View style={styles.cardTextContent}>
+                    <View style={styles.cardHeader}>
+                      <Text style={[styles.cardTitle, { color: theme.moduleCardText || theme.textPrimary }]} numberOfLines={1}>
+                        {item.title}
                       </Text>
-                      <Text style={[styles.progressStatus, { color: theme.textSecondary }]}>
-                        {item.progress === 0 ? 'Not started' : item.progress === 1 ? 'Completed' : 'In progress'}
-                      </Text>
+                      {/* Grade Code Badge */}
+                      <View style={[styles.gradeBadge, { borderColor: theme.moduleCardSub || '#FFFFFF' }]}>
+                        <Text style={[styles.gradeBadgeText, { color: theme.moduleCardSub || '#FFFFFF' }]}>
+                          {item.grade}
+                        </Text>
+                      </View>
                     </View>
-                    <Text style={[styles.progressPct, { color: item.progress === 1 ? '#2E8B57' : activeHighlightColor }]}>
-                      {Math.round(item.progress * 100)}%
+
+                    <Text style={[styles.cardSummary, { color: theme.moduleCardSub || theme.textSecondary }]} numberOfLines={3}>
+                      {item.summary}
                     </Text>
                   </View>
-                  <View style={[styles.progressTrack, { backgroundColor: themeType === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}>
+                </View>
+
+                {/* Progress Bar Container at the Bottom */}
+                <View style={styles.progressContainer}>
+                  <Text style={[styles.progressPct, { color: theme.moduleCardText || '#FFFFFF' }]}>
+                    {Math.round(displayProgress * 100)}%
+                  </Text>
+                  <View style={[styles.progressTrack, { backgroundColor: 'rgba(255,255,255,0.25)' }]}>
                     <View
                       style={[
                         styles.progressFill,
                         {
-                          width: `${item.progress * 100}%`,
-                          backgroundColor: item.progress === 1 ? '#2E8B57' : activeHighlightColor,
+                          width: `${displayProgress * 100}%`,
+                          backgroundColor: theme.progressBarColor || '#FCE762',
                         },
                       ]}
                     />
                   </View>
                 </View>
 
-                <View style={[styles.actionRow, { borderTopColor: themeType === 'dark' ? '#333' : '#EAE6DB' }]}>
-                  <Text style={[styles.actionText, { color: activeHighlightColor }]}>Tap to open in Reader →</Text>
+                {/* Quick Action Row */}
+                <View style={styles.actionRow}>
+                  <TouchableOpacity style={styles.actionBtn} onPress={() => { handleItemPress(item.id); setActiveReaderTab('import'); }}>
+                    <Feather name="file-text" size={12} color={theme.moduleCardSub || '#FFFFFF'} style={{ marginBottom: 3 }} />
+                    <Text style={[styles.actionText, { color: theme.moduleCardSub || '#FFFFFF' }]}>Read</Text>
+                  </TouchableOpacity>
+
+                  <View style={[styles.actionDivider, { backgroundColor: 'rgba(255,255,255,0.15)' }]} />
+
+                  <TouchableOpacity style={styles.actionBtn} onPress={() => { handleItemPress(item.id); setActiveReaderTab('review'); }}>
+                    <Feather name="list" size={12} color={theme.moduleCardSub || '#FFFFFF'} style={{ marginBottom: 3 }} />
+                    <Text style={[styles.actionText, { color: theme.moduleCardSub || '#FFFFFF' }]}>Review</Text>
+                  </TouchableOpacity>
+
+                  <View style={[styles.actionDivider, { backgroundColor: 'rgba(255,255,255,0.15)' }]} />
+
+                  <TouchableOpacity style={styles.actionBtn} onPress={() => { handleItemPress(item.id); setActiveReaderTab('flashcard'); }}>
+                    <Feather name="zap" size={12} color={theme.moduleCardSub || '#FFFFFF'} style={{ marginBottom: 3 }} />
+                    <Text style={[styles.actionText, { color: theme.moduleCardSub || '#FFFFFF' }]}>Quiz</Text>
+                  </TouchableOpacity>
+
+                  <View style={[styles.actionDivider, { backgroundColor: 'rgba(255,255,255,0.15)' }]} />
+
+                  {/* Share button */}
+                  <TouchableOpacity 
+                    style={styles.actionBtn}
+                    onPress={() => {
+                      const payload = dynamicLessons[item.id] || MOCK_LESSONS_BY_ID[item.id];
+                      setSelectedShareTitle(item.title);
+                      setSelectedShareSubtitle(item.grade);
+                      setSelectedSharePayload(payload || null);
+                      setIsShareModalVisible(true);
+                    }}>
+                    <Feather name="share-2" size={12} color={theme.moduleCardSub || '#FFFFFF'} style={{ marginBottom: 3 }} />
+                    <Text style={[styles.actionText, { color: theme.moduleCardSub || '#FFFFFF' }]}>Share</Text>
+                  </TouchableOpacity>
                 </View>
               </TouchableOpacity>
-            ))}
+              );
+            })}
           </View>
         )}
 
       </ScrollView>
+
+      {/* Modals */}
+      <ShareNoteModal 
+        visible={isShareModalVisible} 
+        onClose={() => setIsShareModalVisible(false)} 
+        title={selectedShareTitle} 
+        subtitle={selectedShareSubtitle}
+        payload={selectedSharePayload}
+      />
 
       {/* Tab Bar */}
       <TabBar />
@@ -267,163 +358,174 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
-  scrollContent: {
+  headerBanner: {
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    paddingTop: Platform.OS === 'ios' ? 24 : 16,
+    paddingBottom: 24,
     paddingHorizontal: 24,
-    paddingTop: 24,
-    paddingBottom: 32,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  header: {
-    marginBottom: 24,
-    width: '100%',
-    maxWidth: 600,
-    alignSelf: 'center',
-  },
-  headerSubtitle: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1.5,
-    marginBottom: 4,
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
   },
   headerTitle: {
-    fontSize: 28,
-    fontWeight: '800',
+    fontSize: 26,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
   },
-  listContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 16,
-    width: '100%',
-    maxWidth: 600,
-    alignSelf: 'center',
-  },
-  card: {
-    borderRadius: 20,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.03)',
-    flex: 1,
-    minWidth: 260,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  cardGrade: {
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-  },
-  cardWords: {
-    fontSize: 11,
-    fontWeight: '500',
-    opacity: 0.8,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    marginBottom: 8,
-  },
-  cardSummary: {
-    fontSize: 13,
-    lineHeight: 18,
-    marginBottom: 10,
-  },
-  progressContainer: {
-    marginTop: 10,
-    marginBottom: 16,
-  },
-  progressBarInfo: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  statusBadgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  statusBadgeIcon: {
-    fontSize: 12,
-  },
-  progressPct: {
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  progressStatus: {
-    fontSize: 11.5,
-    fontWeight: '600',
-  },
-  progressTrack: {
-    height: 9,
-    borderRadius: 4.5,
-    width: '100%',
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 4.5,
-  },
-  actionRow: {
-    borderTopWidth: 1,
-    paddingTop: 10,
-    marginTop: 4,
-  },
-  actionText: {
-    fontSize: 12,
-    fontWeight: '700',
+  headerBookIcon: {
+    width: 50,
+    height: 50,
   },
   searchBarContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 44,
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    height: 48,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.04)',
-    marginBottom: 16,
-    width: '100%',
-    maxWidth: 600,
-    alignSelf: 'center',
   },
   searchIcon: {
-    fontSize: 16,
-    marginRight: 10,
-    opacity: 0.6,
+    marginRight: 8,
   },
   searchInput: {
     flex: 1,
     fontSize: 14.5,
-    height: '100%',
+    color: '#333333',
+    paddingVertical: 8,
   },
   searchClearText: {
-    fontSize: 14,
-    fontWeight: '700',
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
+  },
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 110, // clear the tab bar
   },
   filtersScroll: {
-    flexGrow: 0,
-    marginBottom: 24,
-    width: '100%',
-    maxWidth: 600,
-    alignSelf: 'center',
+    marginBottom: 16,
   },
   filtersContainer: {
-    gap: 8,
-    paddingHorizontal: 2,
+    flexDirection: 'row',
     paddingVertical: 4,
   },
   filterPill: {
     paddingVertical: 8,
     paddingHorizontal: 16,
-    borderRadius: 20,
+    borderRadius: 18,
     borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    marginRight: 10,
   },
   filterPillText: {
-    fontSize: 12.5,
+    fontSize: 13,
+  },
+  listContainer: {
+    width: '100%',
+    maxWidth: 600,
+    alignSelf: 'center',
+  },
+  card: {
+    borderRadius: 24,
+    padding: 18,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  cardMainRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  cardImage: {
+    width: 82,
+    height: 82,
+    borderRadius: 12,
+    marginRight: 14,
+  },
+  cardTextContent: {
+    flex: 1,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  cardTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    flex: 1,
+    marginRight: 8,
+  },
+  gradeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  gradeBadgeText: {
+    fontSize: 9.5,
+    fontWeight: '800',
+  },
+  cardSummary: {
+    fontSize: 11.5,
+    lineHeight: 16.5,
+  },
+  progressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  progressPct: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    marginRight: 10,
+    width: 38,
+    textAlign: 'right',
+  },
+  progressTrack: {
+    flex: 1,
+    height: 10,
+    borderRadius: 5,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 5,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.12)',
+    paddingTop: 12,
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+  actionBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    flex: 1,
+  },
+  actionDivider: {
+    width: 1,
+    height: 32,
+    borderRadius: 1,
+  },
+  actionText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
   emptyCard: {
     borderRadius: 24,
@@ -431,15 +533,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.03)',
     width: '100%',
     maxWidth: 600,
     alignSelf: 'center',
-  },
-  emptyCardIcon: {
-    fontSize: 48,
-    marginBottom: 14,
   },
   emptyCardTitle: {
     fontSize: 18,
@@ -447,12 +543,11 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   emptyCardSubtitle: {
-    fontSize: 13,
+    fontSize: 12.5,
     textAlign: 'center',
-    lineHeight: 18,
-    marginBottom: 20,
-    maxWidth: '80%',
     opacity: 0.8,
+    marginBottom: 20,
+    lineHeight: 18,
   },
   resetBtn: {
     paddingVertical: 10,

@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, useWindowDimensions } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Switch, ScrollView, useWindowDimensions } from 'react-native';
+import { Text } from './A11yText';
 import { useA11yStore } from '../store/useA11yStore';
 import { THEMES, ThemeType } from '../theme/themes';
 

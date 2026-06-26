@@ -1,54 +1,253 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   StyleSheet,
   View,
-  Text,
   TouchableOpacity,
   ActivityIndicator,
   SafeAreaView,
   StatusBar,
+  Alert,
+  Platform,
+  TextInput,
+  ScrollView,
 } from 'react-native';
+import { Text } from '../components/A11yText';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 import { useA11yStore } from '../store/useA11yStore';
 import { THEMES } from '../theme/themes';
 
 export const CameraScreen: React.FC = () => {
-  const { themeType, setActiveScreen } = useA11yStore();
+  const { themeType, setActiveScreen, setSelectedMaterialId, addDynamicLesson, setActiveReaderTab, apiUrl } = useA11yStore();
   const theme = THEMES[themeType];
   
+  const cameraRef = useRef<CameraView>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [isScanning, setIsScanning] = useState(false);
   const [scanSource, setScanSource] = useState<'camera' | 'image' | 'file'>('camera');
+  const [showPasteInput, setShowPasteInput] = useState(false);
+  const [pastedText, setPastedText] = useState('');
 
-  const handleCapture = () => {
-    setScanSource('camera');
+  const handleUploadPastedText = async () => {
+    if (!pastedText.trim()) {
+      Alert.alert("Empty Text", "Please paste or type some text first.");
+      return;
+    }
+    
     setIsScanning(true);
-    // Simulate OCR text extraction loading animation
-    setTimeout(() => {
-      setIsScanning(false);
-      setActiveScreen('reader'); // open the reader with scanned summary
-    }, 1800);
-  };
-
-  const handleImportImage = () => {
-    setScanSource('image');
-    setIsScanning(true);
-    // Simulate OCR text extraction from imported image
-    setTimeout(() => {
-      setIsScanning(false);
-      setActiveScreen('reader');
-    }, 1800);
-  };
-
-  const handleImportFile = () => {
     setScanSource('file');
-    setIsScanning(true);
-    // Simulate OCR text extraction from document file
-    setTimeout(() => {
-      setIsScanning(false);
+    try {
+      const uploadUrl = `${apiUrl}/api/v1/generate-review`;
+      
+      const response = await fetch(uploadUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Bypass-Tunnel-Reminder': 'true',
+        },
+        body: JSON.stringify({
+          raw_text: pastedText,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate review material.');
+      }
+
+      const lessonData = await response.json();
+      
+      const newId = `imported-${Date.now()}`;
+      addDynamicLesson(newId, lessonData);
+      setSelectedMaterialId(newId);
+      setActiveReaderTab('import');
       setActiveScreen('reader');
-    }, 1800);
+      setShowPasteInput(false);
+      setPastedText('');
+    } catch (error) {
+      console.error("Paste error:", error);
+      Alert.alert("Error", "Could not process text. Please try again.");
+    } finally {
+      setIsScanning(false);
+    }
   };
+
+  const uploadFileToBackend = async (uri: string, name: string, type: string) => {
+    try {
+      let lessonData;
+      const uploadUrl = `${apiUrl}/api/v1/generate-review-file`;
+
+      if (Platform.OS === 'web') {
+        const formData = new FormData();
+        formData.append('file', {
+          uri,
+          name,
+          type,
+        } as any);
+
+        const response = await fetch(uploadUrl, {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'Bypass-Tunnel-Reminder': 'true',
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to generate review material.');
+        }
+
+        lessonData = await response.json();
+      } else {
+        // Native devices: Use expo-file-system for robust chunk/multipart uploading
+        const uploadResult = await FileSystem.uploadAsync(
+          uploadUrl,
+          uri,
+          {
+            fieldName: 'file',
+            httpMethod: 'POST',
+            uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+            mimeType: type,
+            headers: {
+              'Bypass-Tunnel-Reminder': 'true',
+            },
+          }
+        );
+
+        if (uploadResult.status !== 200) {
+          throw new Error(`Failed to generate review material. Status: ${uploadResult.status}`);
+        }
+
+        lessonData = JSON.parse(uploadResult.body);
+      }
+
+      const newId = `imported-${Date.now()}`;
+      addDynamicLesson(newId, lessonData);
+      setSelectedMaterialId(newId);
+      setActiveReaderTab('import');
+      setActiveScreen('reader');
+    } catch (error) {
+      console.error("Upload error:", error);
+      Alert.alert("Error", "Could not process document. Please try again.");
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  const handleCapture = async () => {
+    setScanSource('camera');
+    if (cameraRef.current) {
+      setIsScanning(true);
+      try {
+        const photo = await cameraRef.current.takePictureAsync({ base64: false });
+        if (photo) {
+          const filename = photo.uri.split('/').pop() || 'photo.jpg';
+          await uploadFileToBackend(photo.uri, filename, 'image/jpeg');
+        } else {
+          setIsScanning(false);
+        }
+      } catch (e) {
+        setIsScanning(false);
+      }
+    }
+  };
+
+  const handleImportImage = async () => {
+    setScanSource('image');
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 1,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setIsScanning(true);
+        const asset = result.assets[0];
+        const filename = asset.fileName || asset.uri.split('/').pop() || 'image.jpg';
+        const type = asset.mimeType || 'image/jpeg';
+        await uploadFileToBackend(asset.uri, filename, type);
+      }
+    } catch (error) {
+      console.error(error);
+      setIsScanning(false);
+    }
+  };
+
+  const handleImportFile = async () => {
+    setScanSource('file');
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'text/plain'],
+        copyToCacheDirectory: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setIsScanning(true);
+        const asset = result.assets[0];
+        const type = asset.mimeType || 'application/octet-stream';
+        await uploadFileToBackend(asset.uri, asset.name, type);
+      }
+    } catch (error) {
+      console.error(error);
+      setIsScanning(false);
+    }
+  };
+
+  if (showPasteInput) {
+    return (
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+        <StatusBar barStyle={themeType === 'dark' ? 'light-content' : 'dark-content'} />
+        <View style={styles.pasteContainer}>
+          <View style={styles.pasteHeader}>
+            <TouchableOpacity
+              style={[styles.backBtn, { backgroundColor: themeType === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}
+              onPress={() => setShowPasteInput(false)}
+            >
+              <Text style={[styles.backBtnText, { color: theme.textPrimary }]}>✕ Cancel</Text>
+            </TouchableOpacity>
+            <Text style={[styles.pasteTitle, { color: theme.textPrimary }]}>Paste Study Text</Text>
+            <View style={{ width: 60 }} />
+          </View>
+          
+          <ScrollView contentContainerStyle={styles.pasteScroll} keyboardShouldPersistTaps="handled">
+            <Text style={[styles.pasteLabel, { color: theme.textSecondary }]}>
+              Paste or type your textbook chapter, article, or reading passage below:
+            </Text>
+            
+            <TextInput
+              style={[
+                styles.pasteTextInput,
+                {
+                  backgroundColor: theme.cardBackground,
+                  color: theme.textPrimary,
+                  borderColor: themeType === 'dark' ? '#444' : '#E0DCD0',
+                }
+              ]}
+              multiline
+              placeholder="Start typing or paste your text here..."
+              placeholderTextColor={theme.textSecondary}
+              value={pastedText}
+              onChangeText={setPastedText}
+              textAlignVertical="top"
+            />
+            
+            <TouchableOpacity
+              style={[styles.submitBtn, { backgroundColor: theme.accent }]}
+              onPress={handleUploadPastedText}
+              disabled={isScanning}
+            >
+              {isScanning ? (
+                <ActivityIndicator size="small" color="#ffffff" />
+              ) : (
+                <Text style={styles.submitBtnText}>✨ Generate Study Material</Text>
+              )}
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (!permission) {
     // Camera permissions are still loading
@@ -102,6 +301,15 @@ export const CameraScreen: React.FC = () => {
           </View>
 
           <TouchableOpacity
+            style={[styles.fallbackBtn, { backgroundColor: theme.cardBackground, width: '100%', maxWidth: 400, marginTop: 8 }]}
+            onPress={() => setShowPasteInput(true)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.fallbackBtnIcon}>✍️</Text>
+            <Text style={[styles.fallbackBtnText, { color: theme.textPrimary }]}>Paste Text Manually</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
             style={styles.cancelLink}
             onPress={() => setActiveScreen('home')}
           >
@@ -117,9 +325,10 @@ export const CameraScreen: React.FC = () => {
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
       
       {/* Real Viewfinder */}
-      <CameraView style={StyleSheet.absoluteFillObject} facing="back">
-        {/* Shutter Scan Guidelines Overlay */}
-        <View style={styles.overlayContainer}>
+      <CameraView ref={cameraRef} style={StyleSheet.absoluteFillObject} facing="back" />
+      
+      {/* Shutter Scan Guidelines Overlay */}
+      <View style={[styles.overlayContainer, StyleSheet.absoluteFillObject]} pointerEvents="box-none">
           
           {/* Header */}
           <View style={styles.cameraHeader}>
@@ -130,7 +339,12 @@ export const CameraScreen: React.FC = () => {
               <Text style={styles.backBtnText}>✕ Close</Text>
             </TouchableOpacity>
             <Text style={styles.cameraTitle}>Scan & Import</Text>
-            <View style={{ width: 60 }} /> {/* balance back button */}
+            <TouchableOpacity
+              style={styles.backBtn}
+              onPress={() => setShowPasteInput(true)}
+            >
+              <Text style={styles.backBtnText}>✍️ Paste</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Framing Target Box */}
@@ -173,10 +387,7 @@ export const CameraScreen: React.FC = () => {
               <Text style={styles.importIconLabel}>Import File</Text>
             </TouchableOpacity>
           </View>
-
         </View>
-      </CameraView>
-
       {/* OCR processing loading shield */}
       {isScanning && (
         <View style={styles.processingShield}>
@@ -417,5 +628,53 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textAlign: 'center',
     lineHeight: 18,
+  },
+  pasteContainer: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
+  pasteHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+  },
+  pasteTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  pasteScroll: {
+    paddingVertical: 20,
+  },
+  pasteLabel: {
+    fontSize: 14,
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  pasteTextInput: {
+    height: 300,
+    borderWidth: 1.5,
+    borderRadius: 16,
+    padding: 16,
+    fontSize: 15,
+    marginBottom: 20,
+  },
+  submitBtn: {
+    paddingVertical: 14,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  submitBtnText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '800',
   },
 });

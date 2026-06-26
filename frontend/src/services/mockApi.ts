@@ -1,3 +1,8 @@
+export interface Flashcard {
+  term: string;
+  definition: string;
+}
+
 export interface SummaryPoint {
   full_sentence: string;
   syllabified_words: string[][]; // Array of words, where each word is an array of syllables
@@ -5,7 +10,12 @@ export interface SummaryPoint {
 
 export interface LessonMaterial {
   document_title: string;
-  summary_points: SummaryPoint[];
+  raw_text: string;
+  raw_text_fil: string;
+  review_points: SummaryPoint[];
+  review_points_fil: SummaryPoint[];
+  flashcards: Flashcard[];
+  flashcards_fil: Flashcard[];
 }
 
 /**
@@ -20,51 +30,50 @@ export function parseLessonPayload(rawPayload: any): LessonMaterial {
   const document_title = typeof rawPayload.document_title === 'string' 
     ? rawPayload.document_title 
     : 'Untitled Document';
-
-  const rawSummaryPoints = Array.isArray(rawPayload.summary_points) 
-    ? rawPayload.summary_points 
-    : [];
-
-  const summary_points: SummaryPoint[] = rawSummaryPoints.map((point: any, index: number) => {
-    // 1. Validate full_sentence
-    const full_sentence = typeof point?.full_sentence === 'string'
-      ? point.full_sentence
-      : `Summary point ${index + 1}`;
-
-    // 2. Validate and fall back for syllabified_words
-    let syllabified_words: string[][] = [];
     
-    if (Array.isArray(point?.syllabified_words)) {
-      // Clean and validate nested array structure
-      syllabified_words = point.syllabified_words.map((wordArr: any) => {
-        if (Array.isArray(wordArr)) {
-          const cleanWord = wordArr
-            .map((syl: any) => (typeof syl === 'string' ? syl : ''))
-            .filter((syl: string) => syl.length > 0);
-          return cleanWord.length > 0 ? cleanWord : [' '];
-        }
-        return typeof wordArr === 'string' ? [wordArr] : [' '];
-      });
-    }
+  const raw_text = typeof rawPayload.raw_text === 'string' ? rawPayload.raw_text : "No raw text available.";
+  const raw_text_fil = typeof rawPayload.raw_text_fil === 'string' ? rawPayload.raw_text_fil : "Walang magagamit na teksto.";
 
-    // Defensive fallback: If syllabified_words is empty, generate from full_sentence
-    if (syllabified_words.length === 0) {
-      const words = full_sentence.split(/\s+/);
-      syllabified_words = words.map((word: string) => {
-        // Very basic client-side syllable estimation for emergency fallback
-        return estimateSyllables(word);
-      });
-    }
+  const parseSummaryList = (rawList: any): SummaryPoint[] => {
+    const arr = Array.isArray(rawList) ? rawList : [];
+    return arr.map((point: any, index: number) => {
+      const full_sentence = typeof point?.full_sentence === 'string' ? point.full_sentence : `Point ${index + 1}`;
+      let syllabified_words: string[][] = [];
+      if (Array.isArray(point?.syllabified_words)) {
+        syllabified_words = point.syllabified_words.map((wordArr: any) => {
+          if (Array.isArray(wordArr)) {
+            const cleanWord = wordArr
+              .map((syl: any) => (typeof syl === 'string' ? syl : ''))
+              .filter((syl: string) => syl.length > 0);
+            return cleanWord.length > 0 ? cleanWord : [' '];
+          }
+          return typeof wordArr === 'string' ? [wordArr] : [' '];
+        });
+      }
+      if (syllabified_words.length === 0) {
+        const words = full_sentence.split(/\s+/);
+        syllabified_words = words.map((word: string) => estimateSyllables(word));
+      }
+      return { full_sentence, syllabified_words };
+    });
+  };
 
-    return {
-      full_sentence,
-      syllabified_words,
-    };
-  });
+  const parseFlashcardList = (rawList: any): Flashcard[] => {
+    const arr = Array.isArray(rawList) ? rawList : [];
+    return arr.map((card: any) => ({
+      term: typeof card?.term === 'string' ? card.term : 'Unknown',
+      definition: typeof card?.definition === 'string' ? card.definition : 'No definition provided.'
+    }));
+  };
 
   return {
     document_title,
-    summary_points: summary_points.length > 0 ? summary_points : getFallbackLessonMaterial("").summary_points,
+    raw_text,
+    raw_text_fil,
+    review_points: parseSummaryList(rawPayload.review_points),
+    review_points_fil: parseSummaryList(rawPayload.review_points_fil),
+    flashcards: parseFlashcardList(rawPayload.flashcards),
+    flashcards_fil: parseFlashcardList(rawPayload.flashcards_fil),
   };
 }
 
@@ -94,7 +103,9 @@ function estimateSyllables(word: string): string[] {
 function getFallbackLessonMaterial(errorContext: string): LessonMaterial {
   return {
     document_title: "Connection Alert",
-    summary_points: [
+    raw_text: `Notice: System load issue or data error occurred. ${errorContext}`,
+    raw_text_fil: `Babala: May problema sa koneksyon. ${errorContext}`,
+    review_points: [
       {
         full_sentence: `Notice: System load issue or data error occurred. ${errorContext}`,
         syllabified_words: [
@@ -108,7 +119,10 @@ function getFallbackLessonMaterial(errorContext: string): LessonMaterial {
           ["oc", "curred", "."]
         ]
       }
-    ]
+    ],
+    review_points_fil: [],
+    flashcards: [],
+    flashcards_fil: []
   };
 }
 
@@ -117,7 +131,9 @@ function getFallbackLessonMaterial(errorContext: string): LessonMaterial {
  */
 export const MOCK_LESSON_DATA: LessonMaterial = {
   document_title: "Understanding Neurodiversity & Reading Modes",
-  summary_points: [
+  raw_text: "Neurodiversity describes the natural variations in human brain function and cognitive styles. Dyslexic readers often decode words more efficiently when text colors alternate between syllables.",
+  raw_text_fil: "Inilalarawan ng neurodiversity ang mga natural na pagkakaiba sa function ng utak ng tao. Mas mabilis makapagbasa ang mga may dyslexia kapag nag-iiba ang kulay ng bawat pantig.",
+  review_points: [
     {
       full_sentence: "Neurodiversity describes the natural variations in human brain function and cognitive styles.",
       syllabified_words: [
@@ -153,13 +169,23 @@ export const MOCK_LESSON_DATA: LessonMaterial = {
         ["syl", "la", "bles", "."]
       ]
     }
-  ]
+  ],
+  review_points_fil: [],
+  flashcards: [
+    {
+      term: "Neurodiversity",
+      definition: "Natural variations in human brain function and cognitive styles."
+    }
+  ],
+  flashcards_fil: []
 };
 
 export const MOCK_LESSONS_BY_ID: Record<string, LessonMaterial> = {
   photo: {
     document_title: "Module 1 - Ch. 4: Photosynthesis & Energy",
-    summary_points: [
+    raw_text: "Chloroplasts capture sunlight to produce glucose. Light-dependent reactions split water to charge ATP. The Calvin cycle uses ATP to synthesize sugars.",
+    raw_text_fil: "Kinukuha ng mga chloroplast ang liwanag ng araw para gumawa ng glucose. Hinihiwalay ng light-dependent reactions ang tubig para kargahan ang ATP. Ginagamit ng Calvin cycle ang ATP para gumawa ng asukal.",
+    review_points: [
       {
         full_sentence: "Topic 1: Overview. Chloroplasts are specialized cell organelles that capture sunlight to produce glucose.",
         syllabified_words: [
@@ -187,11 +213,70 @@ export const MOCK_LESSONS_BY_ID: Record<string, LessonMaterial> = {
           ["sta", "ble"], ["or", "ga", "nic"], ["su", "gars", "."]
         ]
       }
+    ],
+    review_points_fil: [
+      {
+        full_sentence: "Paksa 1: Pangkalahatan. Ang mga chloroplast ay mga organelle ng selula na kumukuha ng liwanag ng araw upang gumawa ng glucose.",
+        syllabified_words: [
+          ["Pak", "sa"], ["1", ":"], ["Pang", "ka", "la", "ha", "tan", "."],
+          ["Ang"], ["mga"], ["chlo", "ro", "plasts"], ["ay"], ["mga"], ["or", "ga", "nelle"],
+          ["ng"], ["se", "lu", "la"], ["na"], ["ku", "mu", "ku", "ha"], ["ng"], ["li", "wa", "nag"],
+          ["ng"], ["a", "raw"], ["u", "pang"], ["gu", "ma", "wa"], ["ng"], ["glu", "cose", "."]
+        ]
+      },
+      {
+        full_sentence: "Paksa 2: Reaksyon sa Liwanag. Hinihiwalay ng light-dependent reactions ang molekula ng tubig upang kargahan ang ATP.",
+        syllabified_words: [
+          ["Pak", "sa"], ["2", ":"], ["Re", "ak", "syon"], ["sa"], ["Li", "wa", "nag", "."],
+          ["Hi", "ni", "hi", "wa", "lay"], ["ng"], ["light-", "de", "pen", "dent"], ["re", "ac", "tions"],
+          ["ang"], ["mo", "le", "ku", "la"], ["ng"], ["tu", "big"], ["u", "pang"], ["kar", "ga", "han"],
+          ["ang"], ["A", "T", "P", "."]
+        ]
+      },
+      {
+        full_sentence: "Paksa 3: Siklo ng Carbon. Ginagamit ng Calvin cycle ang ATP upang pagsamahin ang carbon dioxide para maging asukal.",
+        syllabified_words: [
+          ["Pak", "sa"], ["3", ":"], ["Sik", "lo"], ["ng"], ["Car", "bon", "."],
+          ["Gi", "na", "ga", "mit"], ["ng"], ["Cal", "vin"], ["cy", "cle"], ["ang"], ["A", "T", "P"],
+          ["u", "pang"], ["pag", "sa", "ma", "hin"], ["ang"], ["car", "bon"], ["di", "ox", "ide"],
+          ["pa", "ra"], ["ma", "ging"], ["a", "su", "kal", "."]
+        ]
+      }
+    ],
+    flashcards: [
+      {
+        term: "Chloroplast",
+        definition: "Organelle where photosynthesis takes place."
+      },
+      {
+        term: "ATP",
+        definition: "Energy carrier molecule used by cells."
+      },
+      {
+        term: "Calvin Cycle",
+        definition: "Process that makes sugar from carbon dioxide."
+      }
+    ],
+    flashcards_fil: [
+      {
+        term: "Chloroplast",
+        definition: "Bahagi ng selula kung saan nagaganap ang photosynthesis."
+      },
+      {
+        term: "ATP",
+        definition: "Molekula na nagdadala ng enerhiya sa mga selula."
+      },
+      {
+        term: "Calvin Cycle",
+        definition: "Proseso na gumagawa ng asukal mula sa carbon dioxide."
+      }
     ]
   },
   neuro: {
     document_title: "Extracted Notes - Neurodiversity & Learning",
-    summary_points: [
+    raw_text: "Neurodiversity describes natural variations in brain functions. Dyslexic readers read faster with alternating syllable colors. ADHD focus modes dim surrounding lines.",
+    raw_text_fil: "Ang neurodiversity ay mga pagkakaiba sa utak. Mas mabilis magbasa ang may dyslexia kapag iba-iba ang kulay ng pantig. Ang focus mode ay nagpapadilim sa paligid para sa ADHD.",
+    review_points: [
       {
         full_sentence: "• Natural variations in brain functions describe human neurodivergence.",
         syllabified_words: [
@@ -223,11 +308,68 @@ export const MOCK_LESSONS_BY_ID: Record<string, LessonMaterial> = {
           ["re", "duces"], ["vi", "su", "al"], ["crowd", "ing"], ["and"], ["stress", "."]
         ]
       }
+    ],
+    review_points_fil: [
+      {
+        full_sentence: "• Ang mga natural na pagkakaiba sa utak ay naglalarawan ng neurodivergence.",
+        syllabified_words: [
+          ["•"], ["Ang"], ["mga"], ["na", "tu", "ral"], ["na"], ["pag", "ka", "ka", "i", "ba"],
+          ["sa"], ["u", "tak"], ["ay"], ["nag", "la", "la", "ra", "wan"], ["ng"],
+          ["neu", "ro", "di", "ver", "gence", "."]
+        ]
+      },
+      {
+        full_sentence: "• Mas mabilis magbasa ang mga dyslexic kapag nag-iiba ang kulay ng bawat pantig.",
+        syllabified_words: [
+          ["•"], ["Mas"], ["ma", "bi", "lis"], ["mag", "ba", "sa"], ["ang"], ["mga"],
+          ["dys", "lex", "ic"], ["ka", "pag"], ["nag-", "i", "i", "ba"], ["ang"],
+          ["ku", "lay"], ["ng"], ["ba", "wat"], ["pan", "tig", "."]
+        ]
+      },
+      {
+        full_sentence: "• Ang immersive focus mode ng ADHD ay nagpapadilim sa paligid upang maiwasan ang distraction.",
+        syllabified_words: [
+          ["•"], ["Ang"], ["im", "mer", "sive"], ["fo", "cus"], ["mode"], ["ng"],
+          ["A", "D", "H", "D"], ["ay"], ["nag", "pa", "pa", "di", "lim"], ["sa"],
+          ["pa", "li", "gid"], ["u", "pang"], ["mai", "wa", "san"], ["ang"],
+          ["dis", "trac", "tion", "."]
+        ]
+      }
+    ],
+    flashcards: [
+      {
+        term: "Neurodiversity",
+        definition: "The concept that neurological differences are natural variations."
+      },
+      {
+        term: "Syllabification",
+        definition: "Dividing words into syllables to help dyslexic readers."
+      },
+      {
+        term: "Focus Mode",
+        definition: "A tool that dims non-focused text to help ADHD readers."
+      }
+    ],
+    flashcards_fil: [
+      {
+        term: "Neurodiversity",
+        definition: "Ang konsepto na ang mga pagkakaiba sa utak ay natural na variation lamang."
+      },
+      {
+        term: "Syllabification",
+        definition: "Paghahati ng mga salita sa pantig upang matulungan ang mga dyslexic."
+      },
+      {
+        term: "Focus Mode",
+        definition: "Isang tool na nagpapadilim sa ibang teksto para sa may ADHD."
+      }
     ]
   },
   mitosis: {
     document_title: "Flashcards - Ch. 5: Mitosis & Cell Cycles",
-    summary_points: [
+    raw_text: "Mitosis is nuclear cell division that produces identical nuclei. Prophase condenses chromosomes. Metaphase aligns chromatids. Anaphase separates chromatids.",
+    raw_text_fil: "Ang mitosis ay paghahati ng selula. Sa prophase, namumuo ang mga chromosome. Sa metaphase, pumipila ang mga ito sa gitna. Sa anaphase naman, naghihiwalay ang mga ito.",
+    review_points: [
       {
         full_sentence: "• Term: Mitosis. Definition: Nuclear cell division producing two identical daughter nuclei.",
         syllabified_words: [
@@ -268,11 +410,82 @@ export const MOCK_LESSONS_BY_ID: Record<string, LessonMaterial> = {
           ["as", "sem", "ble"], ["a", "round"], ["chro", "mo", "somes", "."]
         ]
       }
+    ],
+    review_points_fil: [
+      {
+        full_sentence: "• Mitosis: Paghahati ng nucleus na gumagawa ng dalawang parehong nucleus.",
+        syllabified_words: [
+          ["•"], ["Mi", "to", "sis", ":"], ["Pag", "ha", "ha", "ti"], ["ng"], ["nu", "cleus"],
+          ["na"], ["gu", "ma", "ga", "wa"], ["ng"], ["da", "la", "wang"], ["pa", "re", "hong"],
+          ["nu", "cleus", "."]
+        ]
+      },
+      {
+        full_sentence: "• Prophase: Unang yugto kung saan namumuo ang mga chromosome.",
+        syllabified_words: [
+          ["•"], ["Pro", "phase", ":"], ["U", "nang"], ["yug", "to"], ["kung"], ["sa", "an"],
+          ["na", "mu", "muo"], ["ang"], ["mga"], ["chro", "mo", "some", "."]
+        ]
+      },
+      {
+        full_sentence: "• Metaphase: Yugto kung saan pumipila ang mga chromosome sa gitna.",
+        syllabified_words: [
+          ["•"], ["Me", "ta", "phase", ":"], ["Yug", "to"], ["kung"], ["sa", "an"],
+          ["pu", "mi", "pi", "la"], ["ang"], ["mga"], ["chro", "mo", "some"], ["sa"],
+          ["git", "na", "."]
+        ]
+      }
+    ],
+    flashcards: [
+      {
+        term: "Mitosis",
+        definition: "Cell division that results in two identical cells."
+      },
+      {
+        term: "Prophase",
+        definition: "First stage of mitosis where chromosomes condense."
+      },
+      {
+        term: "Metaphase",
+        definition: "Stage of mitosis where chromosomes align in the center."
+      },
+      {
+        term: "Anaphase",
+        definition: "Stage of mitosis where chromatids are pulled apart."
+      },
+      {
+        term: "Telophase",
+        definition: "Final stage where two new nuclear membranes form."
+      }
+    ],
+    flashcards_fil: [
+      {
+        term: "Mitosis",
+        definition: "Paghahati ng selula na nagbubunga ng dalawang magkatulad na selula."
+      },
+      {
+        term: "Prophase",
+        definition: "Unang yugto ng mitosis kung saan namumuo ang mga chromosome."
+      },
+      {
+        term: "Metaphase",
+        definition: "Yugto kung saan pumipila ang mga chromosome sa gitna."
+      },
+      {
+        term: "Anaphase",
+        definition: "Yugto kung saan pinaghihiwalay ang mga chromosome."
+      },
+      {
+        term: "Telophase",
+        definition: "Huling yugto kung saan nabubuo ang dalawang bagong membrane."
+      }
     ]
   },
   respiration: {
     document_title: "Flashcards - Ch. 6: Cellular Respiration Quiz",
-    summary_points: [
+    raw_text: "Glycolysis breaks glucose into pyruvate. The Krebs Cycle generates NADH and FADH2 in mitochondria. ATP Synthase creates chemical ATP energy.",
+    raw_text_fil: "Ang glycolysis ay naghahati ng glucose sa cytoplasm. Ang Krebs Cycle ay gumagawa ng NADH at FADH2. Ang ATP Synthase naman ay gumagawa ng mismong ATP.",
+    review_points: [
       {
         full_sentence: "• Term: Glycolysis. Definition: Anaerobic cytoplasm pathway breaking glucose down into pyruvate molecules.",
         syllabified_words: [
@@ -300,11 +513,65 @@ export const MOCK_LESSONS_BY_ID: Record<string, LessonMaterial> = {
           ["che", "mi", "cal"], ["e", "ner", "gy", "."]
         ]
       }
+    ],
+    review_points_fil: [
+      {
+        full_sentence: "• Glycolysis: Paghahati ng glucose sa cytoplasm nang walang oxygen.",
+        syllabified_words: [
+          ["•"], ["Gly", "co", "ly", "sis", ":"], ["Pag", "ha", "ha", "ti"], ["ng"], ["glu", "cose"],
+          ["sa"], ["cy", "to", "plasm"], ["nang"], ["wa", "lang"], ["o", "xy", "gen", "."]
+        ]
+      },
+      {
+        full_sentence: "• Krebs Cycle: Proseso sa mitochondria na gumagawa ng mga electron carrier.",
+        syllabified_words: [
+          ["•"], ["Krebs"], ["Cy", "cle", ":"], ["Pro", "se", "so"], ["sa"], ["mi", "to", "chon", "dria"],
+          ["na"], ["gu", "ma", "ga", "wa"], ["ng"], ["mga"], ["e", "lec", "tron"], ["car", "rier", "."]
+        ]
+      },
+      {
+        full_sentence: "• ATP Synthase: Enzyme na gumagamit ng proton gradient para gumawa ng ATP.",
+        syllabified_words: [
+          ["•"], ["A", "T", "P"], ["Syn", "thase", ":"], ["En", "zyme"], ["na"], ["gu", "ma", "ga", "mit"],
+          ["ng"], ["pro", "ton"], ["gra", "di", "ent"], ["pa", "ra"], ["gu", "ma", "wa"],
+          ["ng"], ["A", "T", "P", "."]
+        ]
+      }
+    ],
+    flashcards: [
+      {
+        term: "Glycolysis",
+        definition: "The breakdown of glucose by enzymes, releasing energy."
+      },
+      {
+        term: "Krebs Cycle",
+        definition: "A cycle of reactions in the mitochondria to produce energy carriers."
+      },
+      {
+        term: "ATP Synthase",
+        definition: "An enzyme that creates the energy storage molecule ATP."
+      }
+    ],
+    flashcards_fil: [
+      {
+        term: "Glycolysis",
+        definition: "Ang pagkasira ng glucose gamit ang enzymes upang maglabas ng enerhiya."
+      },
+      {
+        term: "Krebs Cycle",
+        definition: "Siklo ng mga reaksyon sa mitochondria upang gumawa ng energy carriers."
+      },
+      {
+        term: "ATP Synthase",
+        definition: "Isang enzyme na gumagawa ng ATP, ang imbakan ng enerhiya."
+      }
     ]
   },
   plant_anatomy: {
     document_title: "Extracted Notes - PDF Upload: Plant Anatomy",
-    summary_points: [
+    raw_text: "Xylem transports water and minerals upward from plant roots. Phloem transports soluble organic compounds synthesized downwards.",
+    raw_text_fil: "Ang xylem ay nagdadala ng tubig at mineral pataas mula sa ugat. Ang phloem naman ay nagdadala ng mga sustansya pababa.",
+    review_points: [
       {
         full_sentence: "• Xylem structures transport soil water and inorganic nutrients upward from roots.",
         syllabified_words: [
@@ -329,11 +596,59 @@ export const MOCK_LESSONS_BY_ID: Record<string, LessonMaterial> = {
           ["sup", "port"], ["to"], ["leaves", "."]
         ]
       }
+    ],
+    review_points_fil: [
+      {
+        full_sentence: "• Ang xylem ay nagdadala ng tubig at mineral pataas mula sa mga ugat.",
+        syllabified_words: [
+          ["•"], ["Ang"], ["xy", "lem"], ["ay"], ["nag", "da", "da", "la"], ["ng"],
+          ["tu", "big"], ["at"], ["mi", "ne", "ral"], ["pa", "ta", "as"], ["mu", "la"],
+          ["sa"], ["mga"], ["u", "gat", "."]
+        ]
+      },
+      {
+        full_sentence: "• Ang phloem naman ay nagdadala ng pagkain mula sa dahon pababa.",
+        syllabified_words: [
+          ["•"], ["Ang"], ["phlo", "em"], ["na", "man"], ["ay"], ["nag", "da", "da", "la"],
+          ["ng"], ["pag", "ka", "in"], ["mu", "la"], ["sa"], ["da", "hon"],
+          ["pa", "ba", "ba", "."]
+        ]
+      }
+    ],
+    flashcards: [
+      {
+        term: "Xylem",
+        definition: "Plant tissue that carries water upward from roots."
+      },
+      {
+        term: "Phloem",
+        definition: "Plant tissue that carries organic nutrients downward."
+      },
+      {
+        term: "Vascular Bundle",
+        definition: "A strand of conducting vessels in the stem and leaves."
+      }
+    ],
+    flashcards_fil: [
+      {
+        term: "Xylem",
+        definition: "Tisyu ng halaman na nagdadala ng tubig pataas mula sa mga ugat."
+      },
+      {
+        term: "Phloem",
+        definition: "Tisyu ng halaman na nagdadala ng pagkain pababa sa ibang bahagi."
+      },
+      {
+        term: "Vascular Bundle",
+        definition: "Grupo ng mga ugat-daluyan sa tangkay at dahon ng halaman."
+      }
     ]
   },
   syllables_fil: {
     document_title: "Module 2 - Filipino Phonetics & Reading",
-    summary_points: [
+    raw_text: "Ang mga patinig ay a, e, i, o, u. Ang bawat pantig ay may katinig at patinig. Mahalaga ang wastong diin sa pagbasa upang malaman ang tamang kahulugan.",
+    raw_text_fil: "Ang mga patinig ay a, e, i, o, u. Ang bawat pantig ay may katinig at patinig. Mahalaga ang wastong diin sa pagbasa upang malaman ang tamang kahulugan.",
+    review_points: [
       {
         full_sentence: "Paksa 1: Mga Patinig. Ang mga patinig sa alpabetong Filipino ay a, e, i, o, at u.",
         syllabified_words: [
@@ -360,6 +675,63 @@ export const MOCK_LESSONS_BY_ID: Record<string, LessonMaterial> = {
           ["ka", "hu", "lu", "gan", "."]
         ]
       }
+    ],
+    review_points_fil: [
+      {
+        full_sentence: "Paksa 1: Mga Patinig. Ang mga patinig sa alpabetong Filipino ay a, e, i, o, at u.",
+        syllabified_words: [
+          ["Pak", "sa"], ["1", ":"], ["Mga"], ["Pa", "ti", "nig", "."],
+          ["Ang"], ["mga"], ["pa", "ti", "nig"], ["sa"], ["al", "pa", "be", "tong"],
+          ["Fi", "li", "pi", "no"], ["ay"], ["a", ","], ["e", ","], ["i", ","],
+          ["o", ","], ["at"], ["u", "."]
+        ]
+      },
+      {
+        full_sentence: "Paksa 2: Pantig. Ang bawat pantig ay binubuo ng pagsasama ng katinig at patinig.",
+        syllabified_words: [
+          ["Pak", "sa"], ["2", ":"], ["Pan", "tig", "."],
+          ["Ang"], ["ba", "wat"], ["pan", "tig"], ["ay"], ["bi", "nu", "buo"], ["ng"],
+          ["pag", "sa", "sa", "ma"], ["ng"], ["ka", "ti", "nig"], ["at"], ["pa", "ti", "nig", "."]
+        ]
+      },
+      {
+        full_sentence: "Paksa 3: Diin. Mahalaga ang wastong diin sa pagbasa upang malaman ang tamang kahulugan.",
+        syllabified_words: [
+          ["Pak", "sa"], ["3", ":"], ["Di", "in", "."],
+          ["Ma", "ha", "la", "ga"], ["ang"], ["was", "tong"], ["di", "in"], ["sa"],
+          ["pag", "ba", "sa"], ["u", "pang"], ["ma", "la", "man"], ["ang"], ["ta", "mang"],
+          ["ka", "hu", "lu", "gan", "."]
+        ]
+      }
+    ],
+    flashcards: [
+      {
+        term: "Vowels",
+        definition: "The letters A, E, I, O, U in the Filipino alphabet."
+      },
+      {
+        term: "Syllable",
+        definition: "A unit of pronunciation having one vowel sound."
+      },
+      {
+        term: "Stress (Diin)",
+        definition: "The emphasis placed on a syllable in speaking."
+      }
+    ],
+    flashcards_fil: [
+      {
+        term: "Patinig",
+        definition: "Ang mga titik na A, E, I, O, U sa alpabetong Filipino."
+      },
+      {
+        term: "Pantig",
+        definition: "Yunit ng pagbigkas na may isang tunog ng patinig."
+      },
+      {
+        term: "Diin",
+        definition: "Ang lakas o bigat na ibinibigay sa pagbigkas ng pantig."
+      }
     ]
   }
 };
+

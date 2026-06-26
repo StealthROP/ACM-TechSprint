@@ -7,11 +7,95 @@ export interface ThemePalette {
   accent: string;
   maskColor: string;     // Color overlay for immersive focus mode
   maskOpacity: number;   // Opacity level for masking
+  
+  // Custom figma-matching style tokens for layout sections
+  headerBg?: string;         // Header block background color
+  moduleCardBg?: string;     // Library/dashboard module card background
+  moduleCardText?: string;   // Module card text color
+  moduleCardSub?: string;    // Module card subtext/accent color
+  progressBarColor?: string; // Module progress bar fill color
+  tabActiveBg?: string;      // Tab bar active item background badge
+  tabActiveIcon?: string;    // Tab bar active item icon/text color
+  tabBarBg?: string;         // Tab bar background
+  heroCardBg?: string;       // Dashboard/Import bottom hero card background
+  heroBtnBg?: string;        // Dashboard/Import bottom hero button background
+  topHeroCardBg?: string;    // Dashboard welcome review banner background
+  topHeroBtnBg?: string;     // Dashboard welcome review banner button background
+  topHeroBtnText?: string;   // Dashboard welcome review banner button text color
 }
 
-export type ThemeType = 'cream' | 'mint' | 'lavender' | 'dark' | 'harsh';
+export type ThemeType = 'cream' | 'mint' | 'lavender' | 'dark' | 'harsh' | 'normal' | 'dyslexic' | 'autistic';
 
 export const THEMES: Record<ThemeType, ThemePalette> = {
+  normal: {
+    name: 'Normal Theme',
+    background: '#FAF6EE',       // Screen background
+    cardBackground: '#FAF6EE',
+    textPrimary: '#3E2723',      // Dark brown/black
+    textSecondary: '#6D5550',    // Muted brown
+    accent: '#4C342F',           // Dark brown
+    maskColor: '#1E1610',
+    maskOpacity: 0.55,
+    headerBg: '#4C342F',         // Dark brown header
+    moduleCardBg: '#556B54',     // Sage green card
+    moduleCardText: '#FFFFFF',
+    moduleCardSub: '#D4E5D2',    // Light sage subtext
+    progressBarColor: '#FCE762', // Yellow progress bar
+    tabActiveBg: '#CBE3FC',      // Light blue badge
+    tabActiveIcon: '#2A4B7C',    // Dark blue active icon
+    tabBarBg: '#FAF6EE',
+    heroCardBg: '#8FA48E',       // Sage green hero card
+    heroBtnBg: '#4A5E4E',        // Dark green hero button
+    topHeroCardBg: '#4C342F',    // Dark brown top banner
+    topHeroBtnBg: '#FFFFFF',     // White top banner button
+    topHeroBtnText: '#4C342F',
+  },
+  dyslexic: {
+    name: 'Dyslexic Theme',
+    background: '#F5EFE2',       // Warm cream background
+    cardBackground: '#EFE5D3',
+    textPrimary: '#3A2A2A',      // Dark slate brown
+    textSecondary: '#6D5550',    // Muted terracotta
+    accent: '#B38073',           // Terracotta accent
+    maskColor: '#1E1610',
+    maskOpacity: 0.55,
+    headerBg: '#B38073',         // Terracotta header
+    moduleCardBg: '#5C7D82',     // Steel blue/dusty blue card
+    moduleCardText: '#FFFFFF',
+    moduleCardSub: '#D5E5E8',    // Light blue subtext
+    progressBarColor: '#FCE762', // Yellow progress bar
+    tabActiveBg: '#CBE3FC',
+    tabActiveIcon: '#2A4B7C',
+    tabBarBg: '#EFE5D3',
+    heroCardBg: '#8CA5A5',       // Dusty blue-gray hero card
+    heroBtnBg: '#4B5F61',        // Dark blue-gray hero button
+    topHeroCardBg: '#B38073',    // Terracotta top banner
+    topHeroBtnBg: '#FFFFFF',
+    topHeroBtnText: '#B38073',
+  },
+  autistic: {
+    name: 'Autistic Theme',
+    background: '#E5ECF0',       // Soft blue-gray background
+    cardBackground: '#DFE6EB',
+    textPrimary: '#1A2530',      // Dark navy slate
+    textSecondary: '#4A5A6A',    // Muted slate blue
+    accent: '#203346',           // Dark navy accent
+    maskColor: '#071A11',
+    maskOpacity: 0.55,
+    headerBg: '#203346',         // Dark navy header
+    moduleCardBg: '#415B52',     // Slate green/teal card
+    moduleCardText: '#FFFFFF',
+    moduleCardSub: '#D6E8E2',    // Light teal subtext
+    progressBarColor: '#FCE762', // Yellow progress bar
+    tabActiveBg: '#CBE3FC',
+    tabActiveIcon: '#2A4B7C',
+    tabBarBg: '#DFE6EB',
+    heroCardBg: '#6C857B',       // Slate green hero card
+    heroBtnBg: '#344D45',        // Dark slate green button
+    topHeroCardBg: '#203346',    // Dark navy top banner
+    topHeroBtnBg: '#FFFFFF',
+    topHeroBtnText: '#203346',
+  },
   cream: {
     name: 'Warm Cream',
     background: '#FDF5E6',     // Soothing warm cream

@@ -1,14 +1,14 @@
-import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Text } from './A11yText';
 import { useA11yStore } from '../store/useA11yStore';
 import { THEMES } from '../theme/themes';
+import { Feather } from '@expo/vector-icons';
 
 export const TutorChatButton: React.FC = () => {
   const {
     activeScreen,
     setTutorChatVisible,
     themeType,
-    highlightColor,
   } = useA11yStore();
 
   const theme = THEMES[themeType];
@@ -18,23 +18,13 @@ export const TutorChatButton: React.FC = () => {
     return null;
   }
 
-  // Map user-selected highlight color to hex codes
-  const highlightColors: Record<string, string> = {
-    theme: theme.accent,
-    orange: '#F27A1A',
-    teal: '#139A8C',
-    purple: '#8A2BE2',
-    green: '#2E8B57',
-  };
-  const activeHighlightColor = highlightColors[highlightColor] || theme.accent;
-
   return (
     <TouchableOpacity
-      style={[styles.floatingBtn, { backgroundColor: activeHighlightColor }]}
+      style={[styles.floatingBtn, { backgroundColor: theme.accent }]}
       onPress={() => setTutorChatVisible(true)}
       activeOpacity={0.8}
     >
-      <Text style={styles.btnIcon}>💬</Text>
+      <Feather name="message-square" size={24} color="#FFFFFF" />
       <View style={styles.badge}>
         <Text style={styles.badgeText}>AI</Text>
       </View>

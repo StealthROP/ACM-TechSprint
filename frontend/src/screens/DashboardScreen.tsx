@@ -1,27 +1,66 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   StyleSheet,
   View,
-  Text,
   TouchableOpacity,
   ScrollView,
   SafeAreaView,
   Platform,
   StatusBar,
+  Image,
 } from 'react-native';
+import { Text } from '../components/A11yText';
 import { useA11yStore } from '../store/useA11yStore';
 import { THEMES } from '../theme/themes';
 import { TabBar } from '../components/TabBar';
+import { ProfileModal } from '../components/ProfileModal';
+import { getImageAsset } from '../theme/images';
+import { Feather } from '@expo/vector-icons';
 
 export const DashboardScreen: React.FC = () => {
   const {
     themeType,
     setActiveScreen,
     setSettingsModalVisible,
+    profileName,
+    profilePhotoUri,
+    fontFamily,
+    streak,
+    weeklyMinutes,
+    totalCardsRead,
+    totalCorrect,
+    totalAttempts,
+    sessionStartTime,
     highlightColor,
   } = useA11yStore();
 
   const theme = THEMES[themeType];
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  // Cognitive style determination for dynamic assets
+  const cognitiveStyle = fontFamily === 'OpenDyslexic' ? 'dyslexic' : 'standard';
+
+  // Derived metrics
+  const accuracyPct = totalAttempts > 0
+    ? Math.round((totalCorrect / totalAttempts) * 100)
+    : 0;
+
+  const totalWeekMins = useMemo(
+    () => weeklyMinutes.reduce((a, b) => a + b, 0),
+    [weeklyMinutes]
+  );
+
+  // Live session minutes (if currently in a session)
+  const liveSessionMins = sessionStartTime
+    ? Math.round((Date.now() - sessionStartTime) / 60000)
+    : 0;
+
+  const totalFocusMins = totalWeekMins + liveSessionMins;
+  const focusHoursDisplay = totalFocusMins < 60
+    ? `${totalFocusMins}m`
+    : `${(totalFocusMins / 60).toFixed(1)}h`;
+
+  const maxMins = Math.max(...weeklyMinutes, 1);
 
   // Map user-selected highlight color to hex codes
   const highlightColors: Record<string, string> = {
@@ -33,117 +72,118 @@ export const DashboardScreen: React.FC = () => {
   };
   const activeHighlightColor = highlightColors[highlightColor] || theme.accent;
 
-  const handleScanTextbook = () => {
-    setActiveScreen('camera');
-  };
-
-  const handleViewStudyCards = () => {
-    setActiveScreen('library');
-  };
-
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
-        {/* User Analytics Panel & Greeting (Integrated First) */}
-        <View style={[styles.analyticsCard, { backgroundColor: theme.cardBackground, marginTop: 8 }]}>
-          {/* Integrated Header Row */}
-          <View style={styles.integratedHeaderRow}>
-            <View style={styles.userProfileCol}>
-              <View style={[styles.avatar, { backgroundColor: theme.background }]}>
-                <Text style={styles.avatarText}>👦</Text>
-              </View>
-              <View style={styles.userTextCol}>
-                <Text style={[styles.welcomeText, { color: theme.textSecondary, fontSize: 13 }]}>Welcome back,</Text>
-                <Text style={[styles.usernameText, { color: theme.textPrimary, fontSize: 20 }]}>Alex</Text>
-              </View>
+        {/* User Profile Welcome Header */}
+        <View style={styles.topHeader}>
+          <TouchableOpacity
+            style={styles.profileRow}
+            onPress={() => setIsProfileOpen(true)}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.avatar, { borderColor: theme.accent, borderWidth: profilePhotoUri ? 2.5 : 1 }]}>
+              {profilePhotoUri ? (
+                <Image source={{ uri: profilePhotoUri }} style={styles.avatarImg as any} />
+              ) : (
+                <Feather name="user" size={20} color={theme.textPrimary} />
+              )}
             </View>
+            <View style={styles.userTextContainer}>
+              <Text style={[styles.helloText, { color: theme.textSecondary }]}>Hello,</Text>
+              <Text style={[styles.nameText, { color: theme.textPrimary }]}>{profileName}</Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* Settings Button */}
+          <TouchableOpacity
+            style={[styles.settingsBtn, { borderColor: theme.textSecondary, backgroundColor: theme.background }]}
+            onPress={() => setSettingsModalVisible(true)}
+            activeOpacity={0.8}
+          >
+            <Feather name="settings" size={18} color={theme.textPrimary} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Welcome Review Banner */}
+        <View style={[styles.welcomeBanner, { backgroundColor: theme.topHeroCardBg || theme.accent }]}>
+          <View style={styles.welcomeBannerLeft}>
+            <Text style={styles.welcomeBannerTitle}>
+              What would you like to review today?
+            </Text>
             <TouchableOpacity
-              style={[styles.topSettingsContainer, { backgroundColor: theme.background }]}
-              onPress={() => setSettingsModalVisible(true)}
-              activeOpacity={0.8}
+              style={[styles.welcomeBannerBtn, { backgroundColor: theme.topHeroBtnBg || '#FFFFFF' }]}
+              onPress={() => setActiveScreen('library')}
+              activeOpacity={0.85}
             >
-              <Text style={styles.topSettingsIcon}>⚙️</Text>
-              <Text style={[styles.topSettingsLabel, { color: theme.textPrimary }]}>Settings</Text>
+              <Text style={[styles.welcomeBannerBtnText, { color: theme.topHeroBtnText || theme.accent }]}>
+                Get Started
+              </Text>
             </TouchableOpacity>
           </View>
+          <Image
+            source={getImageAsset('girlStudying', cognitiveStyle)}
+            style={styles.welcomeBannerImg as any}
+            resizeMode="contain"
+          />
+        </View>
 
-          <View style={[styles.divider, { backgroundColor: themeType === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]} />
-
-          <Text style={[styles.analyticsTitle, { color: theme.textPrimary, marginTop: 12 }]}>Your Learning Journey</Text>
+        {/* ── User Analytics Panel ── */}
+        <View style={[styles.analyticsCard, { backgroundColor: theme.cardBackground }]}>
+          <Text style={[styles.analyticsTitle, { color: theme.textPrimary }]}>Your Learning Journey</Text>
           
           <View style={styles.analyticsRow}>
             <View style={styles.analyticsTile}>
-              <Text style={[styles.tileNumber, { color: activeHighlightColor }]}>4.2h</Text>
+              <Text style={[styles.tileNumber, { color: activeHighlightColor }]}>{focusHoursDisplay}</Text>
               <Text style={[styles.tileLabel, { color: theme.textSecondary }]}>Focus Time</Text>
             </View>
             <View style={styles.analyticsTile}>
-              <Text style={[styles.tileNumber, { color: activeHighlightColor }]}>12</Text>
+              <Text style={[styles.tileNumber, { color: activeHighlightColor }]}>{totalCardsRead}</Text>
               <Text style={[styles.tileLabel, { color: theme.textSecondary }]}>Cards Read</Text>
             </View>
             <View style={styles.analyticsTile}>
-              <Text style={[styles.tileNumber, { color: activeHighlightColor }]}>94%</Text>
+              <Text style={[styles.tileNumber, { color: activeHighlightColor }]}>
+                {totalAttempts > 0 ? `${accuracyPct}%` : '—'}
+              </Text>
               <Text style={[styles.tileLabel, { color: theme.textSecondary }]}>Accuracy</Text>
             </View>
           </View>
           
-          {/* Aesthetic Weekly Progress Bar Chart */}
+          {/* Dynamic Weekly Progress Bar Chart */}
           <View style={styles.chartContainer}>
             <Text style={[styles.chartSub, { color: theme.textSecondary }]}>Weekly Focus Rate (minutes):</Text>
             <View style={styles.chartRow}>
               {[
-                { day: 'M', mins: 30, h: '45%' },
-                { day: 'T', mins: 45, h: '65%' },
-                { day: 'W', mins: 25, h: '35%' },
-                { day: 'T', mins: 60, h: '85%' },
-                { day: 'F', mins: 15, h: '25%' },
-              ].map((bar, idx) => (
-                <View key={idx} style={styles.chartBarCol}>
-                  <View style={styles.chartBarTrack}>
-                    <View style={[styles.chartBarFill, { height: bar.h as any, backgroundColor: activeHighlightColor }]} />
+                { day: 'Sun', mins: weeklyMinutes[0] || 0 },
+                { day: 'Mon', mins: weeklyMinutes[1] || 0 },
+                { day: 'Tue', mins: weeklyMinutes[2] || 0 },
+                { day: 'Wed', mins: weeklyMinutes[3] || 0 },
+                { day: 'Thu', mins: weeklyMinutes[4] || 0 },
+                { day: 'Fri', mins: weeklyMinutes[5] || 0 },
+                { day: 'Sat', mins: weeklyMinutes[6] || 0 },
+              ].map((bar, idx) => {
+                const fillPct = `${Math.min(100, Math.max(8, Math.round((bar.mins / maxMins) * 100)))}%`;
+                return (
+                  <View key={idx} style={styles.chartBarCol}>
+                    <Text style={{ fontSize: 9, color: theme.textSecondary, marginBottom: 2 }}>{bar.mins}m</Text>
+                    <View style={styles.chartBarTrack}>
+                      <View style={[styles.chartBarFill, { height: fillPct as any, backgroundColor: activeHighlightColor }]} />
+                    </View>
+                    <Text style={[styles.chartBarDay, { color: theme.textSecondary }]}>{bar.day}</Text>
                   </View>
-                  <Text style={[styles.chartBarDay, { color: theme.textSecondary }]}>{bar.day}</Text>
-                </View>
-              ))}
+                );
+              })}
             </View>
           </View>
-        </View>
-
-        {/* Hero Card Transform Section */}
-        <View style={[styles.heroCard, { backgroundColor: theme.cardBackground }]}>
-          <Text style={styles.heroBookIcon}>📖</Text>
-          <Text style={[styles.heroText, { color: theme.textSecondary }]}>
-            Ready to transform your textbook into bite-sized learning moments?
-          </Text>
-        </View>
-
-        {/* Main Action Buttons */}
-        <View style={styles.actionContainer}>
-          <TouchableOpacity
-            style={[styles.primaryButton, { backgroundColor: '#435B4E' }]} // Deep study green
-            onPress={handleScanTextbook}
-            activeOpacity={0.9}
-          >
-            <Text style={styles.primaryButtonIcon}>📷</Text>
-            <Text style={styles.primaryButtonText}>Scan or Import Textbook</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.secondaryButton, { borderColor: '#5C748C', backgroundColor: theme.background }]}
-            onPress={handleViewStudyCards}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.secondaryButtonIcon, { color: '#5C748C' }]}>🗂️</Text>
-            <Text style={[styles.secondaryButtonText, { color: '#3A4D62' }]}>View Saved Study Cards</Text>
-          </TouchableOpacity>
         </View>
 
         {/* Info & Goal Cards */}
         <View style={styles.statsContainer}>
           {/* Study Tip Card */}
           <View style={[styles.statCard, { backgroundColor: theme.cardBackground }]}>
-            <View style={[styles.badge, { backgroundColor: '#D4ECE0' }]}>
-              <Text style={styles.badgeText}>💡</Text>
+            <View style={[styles.badge, { backgroundColor: 'rgba(62, 142, 126, 0.08)' }]}>
+              <Feather name="info" size={20} color={theme.accent} />
             </View>
             <View style={styles.statContent}>
               <Text style={[styles.statLabel, { color: theme.textPrimary }]}>Study Tip</Text>
@@ -155,13 +195,13 @@ export const DashboardScreen: React.FC = () => {
 
           {/* Weekly Goal Card */}
           <View style={[styles.statCard, { backgroundColor: theme.cardBackground }]}>
-            <View style={[styles.badge, { backgroundColor: '#D4E2FC' }]}>
-              <Text style={styles.badgeText}>✅</Text>
+            <View style={[styles.badge, { backgroundColor: 'rgba(92, 120, 186, 0.08)' }]}>
+              <Feather name="check-circle" size={20} color={theme.accent} />
             </View>
             <View style={styles.statContent}>
               <Text style={[styles.statLabel, { color: theme.textPrimary }]}>Weekly Goal</Text>
               <Text style={[styles.statText, { color: theme.textSecondary }]}>
-                You've mastered 12 new cards this week. Keep it up!
+                You've mastered {totalCardsRead} new cards this week. Keep it up!
               </Text>
             </View>
           </View>
@@ -169,7 +209,10 @@ export const DashboardScreen: React.FC = () => {
 
       </ScrollView>
 
-      {/* Navigation Tab Bar */}
+      {/* Profile Modal */}
+      <ProfileModal visible={isProfileOpen} onClose={() => setIsProfileOpen(false)} />
+
+      {/* Tab Bar */}
       <TabBar />
     </SafeAreaView>
   );
@@ -178,74 +221,131 @@ export const DashboardScreen: React.FC = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 8 : 10,
   },
   scrollContent: {
     paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 32,
+    paddingTop: 10,
+    paddingBottom: 110, // clear bottom TabBar
   },
-  integratedHeaderRow: {
+  topHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
-  },
-  divider: {
-    height: 1,
+    justifyContent: 'space-between',
+    marginBottom: 20,
+    marginTop: Platform.OS === 'ios' ? 10 : 15,
     width: '100%',
-    marginVertical: 4,
+    maxWidth: 600,
+    alignSelf: 'center',
   },
-  userProfileCol: {
+  profileRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   avatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#F5ECE1',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.06)',
+    overflow: 'hidden',
+    marginRight: 12,
   },
-  avatarText: {
-    fontSize: 28,
+  avatarImg: {
+    width: '100%',
+    height: '100%',
   },
-  userTextCol: {
-    marginLeft: 12,
+  avatarEmoji: {
+    fontSize: 20,
   },
-  welcomeText: {
-    fontSize: 18,
+  userTextContainer: {
+    flexDirection: 'column',
+  },
+  helloText: {
+    fontSize: 14.5,
     fontWeight: '500',
-    opacity: 0.8,
   },
-  usernameText: {
-    fontSize: 24,
-    fontWeight: '800',
+  nameText: {
+    fontSize: 18.5,
+    fontWeight: 'bold',
     marginTop: -2,
   },
-  topSettingsContainer: {
+  settingsBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: 1.2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  settingsIcon: {
+    fontSize: 18.5,
+  },
+  welcomeBanner: {
+    borderRadius: 24,
+    padding: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 14,
+    justifyContent: 'space-between',
+    position: 'relative',
+    overflow: 'hidden',
+    height: 184,
+    marginBottom: 24,
+    width: '100%',
+    maxWidth: 600,
+    alignSelf: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  welcomeBannerLeft: {
+    width: '58%',
+    justifyContent: 'center',
+    zIndex: 2,
+  },
+  welcomeBannerTitle: {
+    fontSize: 18.5,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    lineHeight: 25,
+  },
+  welcomeBannerBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
     borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
-    gap: 6,
+    marginTop: 18,
+    alignSelf: 'flex-start',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  topSettingsIcon: {
-    fontSize: 16,
-  },
-  topSettingsLabel: {
+  welcomeBannerBtnText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '800',
+  },
+  welcomeBannerImg: {
+    position: 'absolute',
+    right: 6,
+    bottom: -6,
+    width: 146,
+    height: 146,
+    zIndex: 1,
   },
   analyticsCard: {
     borderRadius: 24,
     padding: 20,
-    marginBottom: 20,
+    marginBottom: 24,
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.03)',
     width: '100%',
@@ -303,7 +403,7 @@ const styles = StyleSheet.create({
   },
   chartBarTrack: {
     width: 14,
-    height: 65,
+    height: 52,
     backgroundColor: 'rgba(0,0,0,0.04)',
     borderRadius: 7,
     justifyContent: 'flex-end',
@@ -317,80 +417,6 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     fontWeight: '700',
     marginTop: 6,
-  },
-  heroCard: {
-    borderRadius: 24,
-    paddingVertical: 32,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.03)',
-    width: '100%',
-    maxWidth: 600,
-    alignSelf: 'center',
-  },
-  heroBookIcon: {
-    fontSize: 54,
-    marginBottom: 16,
-  },
-  heroText: {
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
-    lineHeight: 22,
-    maxWidth: '85%',
-  },
-  actionContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 24,
-    width: '100%',
-    maxWidth: 600,
-    alignSelf: 'center',
-  },
-  primaryButton: {
-    flex: 1,
-    minWidth: 260,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 56,
-    borderRadius: 28,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  primaryButtonIcon: {
-    fontSize: 20,
-    marginRight: 10,
-  },
-  primaryButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  secondaryButton: {
-    flex: 1,
-    minWidth: 260,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 56,
-    borderRadius: 28,
-    borderWidth: 1,
-  },
-  secondaryButtonIcon: {
-    fontSize: 18,
-    marginRight: 10,
-  },
-  secondaryButtonText: {
-    fontSize: 15,
-    fontWeight: '700',
   },
   statsContainer: {
     flexDirection: 'row',
@@ -410,6 +436,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.03)',
+    marginBottom: 12,
   },
   badge: {
     width: 44,

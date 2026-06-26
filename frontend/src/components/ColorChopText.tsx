@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text, StyleSheet, TextStyle } from 'react-native';
+import { Text, StyleSheet, TextStyle, Platform } from 'react-native';
 import { useA11yStore } from '../store/useA11yStore';
 import { THEMES } from '../theme/themes';
 
@@ -14,15 +14,26 @@ export const ColorChopText: React.FC<ColorChopTextProps> = ({
   isMuted = false,
   activeWordIndex = null,
 }) => {
-  const { themeType, fontSize, lineSpacing, letterSpacing, highlightColor } = useA11yStore();
+  const { themeType, fontSize, lineSpacing, letterSpacing, highlightColor, fontFamily } = useA11yStore();
   const theme = THEMES[themeType];
   const lineHeight = fontSize * lineSpacing;
+
+  const fontMap: Record<string, string | undefined> = {
+    System: undefined,
+    OpenDyslexic: 'OpenDyslexic',
+    AtkinsonHyperlegible: 'AtkinsonHyperlegible',
+    Serif: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+    Monospace: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  };
+  const activeFontFamily = fontMap[fontFamily];
+  const isCustomFont = fontFamily === 'OpenDyslexic' || fontFamily === 'AtkinsonHyperlegible';
 
   // Outer text container styles
   const baseTextStyle: TextStyle = {
     fontSize,
     lineHeight,
     letterSpacing,
+    fontFamily: activeFontFamily,
     textAlign: 'left', // Dyslexia-friendly left-alignment
   };
 
@@ -72,7 +83,8 @@ export const ColorChopText: React.FC<ColorChopTextProps> = ({
                   importantForAccessibility="no"
                   style={{
                     color: textColor,
-                    fontWeight: '600', // Semi-bold helps outline letters distinctly
+                    fontWeight: isCustomFont ? 'normal' : '600', // Semi-bold helps outline letters distinctly
+                    fontFamily: activeFontFamily,
                   }}
                 >
                   {syllable}

@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   StyleSheet,
   View,
-  Text,
   TextInput,
   TouchableOpacity,
   ScrollView,
@@ -10,45 +9,91 @@ import {
   KeyboardAvoidingView,
   Platform,
   StatusBar,
+  NativeModules,
+  ActivityIndicator,
 } from 'react-native';
+import { Text } from '../components/A11yText';
 import { useA11yStore } from '../store/useA11yStore';
 import { THEMES } from '../theme/themes';
 import { TabBar } from '../components/TabBar';
+import { Feather } from '@expo/vector-icons';
 
 export const TutorScreen: React.FC = () => {
-  const { themeType } = useA11yStore();
+  const { themeType, apiUrl } = useA11yStore();
   const theme = THEMES[themeType];
   const [inputText, setInputText] = useState('');
-
-  const chatMessages = [
+  const [isLoading, setIsLoading] = useState(false);
+  const [chatMessages, setChatMessages] = useState<any[]>([
     {
       id: 1,
       sender: 'ai',
       text: 'Hi Alex! Ready to review your biology cards? Ask me to explain any concept, quiz you, or clarify cell cycles.',
-    },
-    {
-      id: 2,
-      sender: 'user',
-      text: 'Can you explain the light-dependent reactions of photosynthesis simply?',
-    },
-    {
-      id: 3,
-      sender: 'ai',
-      text: 'Think of chloroplasts like solar-powered battery chargers! They absorb sunlight (using solar panels) to charge up energy carriers (batteries), which are then sent to make sugar in the Calvin cycle.',
-    },
-  ];
+    }
+  ]);
+
+  const getBackendUrl = () => {
+    return apiUrl;
+  };
+
+  const handleSend = async () => {
+    if (!inputText.trim() || isLoading) return;
+    
+    const userPrompt = inputText.trim();
+    setInputText('');
+
+    const newUserMsg = { id: Date.now(), sender: 'user', text: userPrompt };
+    const updatedMessages = [...chatMessages, newUserMsg];
+    setChatMessages(updatedMessages);
+    setIsLoading(true);
+
+    let url = '';
+    try {
+      url = `${getBackendUrl()}/api/v1/chat`;
+      const history = updatedMessages.map((msg) => ({
+        role: msg.sender === 'ai' ? 'model' : 'user',
+        text: msg.text,
+      }));
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Bypass-Tunnel-Reminder': 'true'
+        },
+        body: JSON.stringify({ history }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) throw new Error(`API returned status ${response.status}`);
+
+      const data = await response.json();
+      const newAiMsg = { id: Date.now() + 1, sender: 'ai', text: data?.reply || "Error." };
+      setChatMessages((prev) => [...prev, newAiMsg]);
+    } catch (error) {
+      console.error(`Gemini API Error:`, error);
+      const fallbackAiMsg = { id: Date.now() + 1, sender: 'ai', text: "Oops! I'm having trouble connecting to my brain right now. Please check that the backend server is running and try again!" };
+      setChatMessages((prev) => [...prev, fallbackAiMsg]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardView}
       >
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           
           {/* Header */}
           <View style={styles.header}>
-            <Text style={[styles.headerSubtitle, { color: theme.accent }]}>AI STUDY COMPANION</Text>
+            <Text style={[styles.headerSubtitle, { color: theme.accent }]}>BelongED AI TUTOR</Text>
             <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>Tutor Mode</Text>
           </View>
 
@@ -66,14 +111,22 @@ export const TutorScreen: React.FC = () => {
                       : [styles.userBubble, { backgroundColor: '#435B4E' }], // Match dark green button
                   ]}
                 >
-                  <Text
-                    style={[
-                      styles.senderLabel,
-                      { color: isAi ? theme.accent : '#D4ECE0' },
-                    ]}
-                  >
-                    {isAi ? '🤖 AI Tutor' : '👦 Alex'}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                    <Feather 
+                      name={isAi ? "cpu" : "user"} 
+                      size={12} 
+                      color={isAi ? theme.accent : '#D4ECE0'} 
+                      style={{ marginRight: 4 }} 
+                    />
+                    <Text
+                      style={[
+                        styles.senderLabel,
+                        { color: isAi ? theme.accent : '#D4ECE0' },
+                      ]}
+                    >
+                      {isAi ? 'AI Tutor' : 'Alex'}
+                    </Text>
+                  </View>
                   <Text
                     style={[
                       styles.messageText,
@@ -96,8 +149,8 @@ export const TutorScreen: React.FC = () => {
               value={inputText}
               onChangeText={setInputText}
             />
-            <TouchableOpacity style={[styles.sendBtn, { backgroundColor: theme.accent }]}>
-              <Text style={styles.sendBtnText}>➔</Text>
+            <TouchableOpacity style={[styles.sendBtn, { backgroundColor: theme.accent }]} onPress={handleSend} disabled={isLoading}>
+              {isLoading ? <ActivityIndicator color="#fff" size="small" /> : <Feather name="send" size={14} color="#fff" />}
             </TouchableOpacity>
           </View>
 

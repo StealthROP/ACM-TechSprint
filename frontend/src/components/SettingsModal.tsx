@@ -1,16 +1,21 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Modal,
   View,
-  Text,
   StyleSheet,
   TouchableOpacity,
   Switch,
   ScrollView,
   useWindowDimensions,
+  Platform,
+  TextInput,
+  Image,
 } from 'react-native';
-import { useA11yStore, HighlightColorType } from '../store/useA11yStore';
+import { Text } from './A11yText';
+import { useA11yStore, HighlightColorType, getDefaultApiUrl } from '../store/useA11yStore';
 import { THEMES, ThemeType } from '../theme/themes';
+import * as Speech from 'expo-speech';
+import { ProfileModal } from './ProfileModal';
 
 export const SettingsModal: React.FC = () => {
   const {
@@ -24,6 +29,8 @@ export const SettingsModal: React.FC = () => {
     setLineSpacing,
     letterSpacing,
     setLetterSpacing,
+    fontFamily,
+    setFontFamily,
     focusModeEnabled,
     setFocusModeEnabled,
     ttsSpeed,
@@ -32,7 +39,13 @@ export const SettingsModal: React.FC = () => {
     setTtsPitch,
     highlightColor,
     setHighlightColor,
+    apiUrl,
+    setApiUrl,
+    profileName,
+    profilePhotoUri,
   } = useA11yStore();
+
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   const theme = THEMES[themeType];
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
@@ -54,6 +67,25 @@ export const SettingsModal: React.FC = () => {
   const minTtsPitch = 0.5;
   const maxTtsPitch = 2.0;
 
+  const highlightBgs: Record<string, string> = {
+    theme: themeType === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.06)',
+    orange: '#FFE8D6',
+    teal: '#D0F0EC',
+    purple: '#E8DFFF',
+    green: '#D5F3E5',
+  };
+
+  const highlightColors: Record<string, string> = {
+    theme: theme.accent,
+    orange: '#F27A1A',
+    teal: '#139A8C',
+    purple: '#8A2BE2',
+    green: '#2E8B57',
+  };
+
+  const activeHighlightBg = highlightBgs[highlightColor] || 'rgba(0, 0, 0, 0.05)';
+  const activeHighlightBorder = highlightColors[highlightColor] || theme.accent;
+
   const highlightOptions: { type: HighlightColorType; label: string; color: string }[] = [
     { type: 'theme', label: 'Default', color: theme.accent },
     { type: 'orange', label: 'Orange', color: '#F27A1A' },
@@ -62,15 +94,60 @@ export const SettingsModal: React.FC = () => {
     { type: 'green', label: 'Green', color: '#2E8B57' },
   ];
 
+  const fontOptions = [
+    { id: 'System', label: 'Default', nativeName: undefined },
+    { id: 'OpenDyslexic', label: 'OpenDyslexic', nativeName: 'OpenDyslexic' },
+    { id: 'AtkinsonHyperlegible', label: 'Atkinson Hyperlegible', nativeName: 'AtkinsonHyperlegible' },
+    { id: 'Serif', label: 'Serif', nativeName: Platform.OS === 'ios' ? 'Georgia' : 'serif' },
+    { id: 'Monospace', label: 'Monospace', nativeName: Platform.OS === 'ios' ? 'Courier' : 'monospace' },
+  ];
+
   const handleReset = () => {
     setThemeType('cream');
     setFontSize(18);
     setLineSpacing(1.6);
     setLetterSpacing(2);
+    setFontFamily('System');
     setFocusModeEnabled(true);
     setTtsSpeed(1.0);
     setTtsPitch(1.0);
     setHighlightColor('theme');
+  };
+
+  const speakTest = (speed: number, pitch: number) => {
+    Speech.stop();
+    Speech.speak("This is the current sound.", {
+      rate: speed,
+      pitch: pitch,
+    });
+  };
+
+  const handleTtsSpeedChange = (newSpeed: number) => {
+    setTtsSpeed(newSpeed);
+    speakTest(newSpeed, ttsPitch);
+  };
+
+  const handleTtsPitchChange = (newPitch: number) => {
+    setTtsPitch(newPitch);
+    speakTest(ttsSpeed, newPitch);
+  };
+
+  const handleHighlightChange = (colorType: HighlightColorType, label: string) => {
+    setHighlightColor(colorType);
+    Speech.stop();
+    Speech.speak(`${label} highlight accent selected.`, {
+      rate: ttsSpeed,
+      pitch: ttsPitch,
+    });
+  };
+
+  const handleFontChange = (fontId: string, label: string) => {
+    setFontFamily(fontId);
+    Speech.stop();
+    Speech.speak(`${label} font style selected.`, {
+      rate: ttsSpeed,
+      pitch: ttsPitch,
+    });
   };
 
   return (
@@ -114,7 +191,30 @@ export const SettingsModal: React.FC = () => {
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-            
+
+            {/* ── Profile Card ──────────────────────────────────── */}
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: theme.accent }]}>My Profile</Text>
+              <TouchableOpacity
+                style={[styles.profileCard, { backgroundColor: theme.cardBackground }]}
+                onPress={() => setIsProfileOpen(true)}
+                activeOpacity={0.8}
+              >
+                <View style={[styles.profileAvatar, { borderColor: theme.accent }]}>
+                  {profilePhotoUri ? (
+                    <Image source={{ uri: profilePhotoUri }} style={styles.profileAvatarImg} />
+                  ) : (
+                    <Text style={{ fontSize: 26 }}>👦</Text>
+                  )}
+                </View>
+                <View style={styles.profileInfo}>
+                  <Text style={[styles.profileName, { color: theme.textPrimary }]}>{profileName}</Text>
+                  <Text style={[styles.profileSub, { color: theme.textSecondary }]}>Tap to edit name & photo</Text>
+                </View>
+                <Text style={[styles.profileChevron, { color: theme.accent }]}>›</Text>
+              </TouchableOpacity>
+            </View>
+
             {/* Theme Selector */}
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, { color: theme.accent }]}>Visual Theme</Text>
@@ -146,9 +246,105 @@ export const SettingsModal: React.FC = () => {
               </View>
             </View>
 
+            {/* Reading Highlight Accent Selector */}
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: theme.accent }]}>Reading Highlight Accent</Text>
+              
+              <View 
+                style={[
+                  styles.previewBox, 
+                  { 
+                    backgroundColor: theme.cardBackground, 
+                    borderLeftWidth: 4, 
+                    borderLeftColor: activeHighlightBorder,
+                    marginBottom: 12,
+                  }
+                ]}
+              >
+                <Text style={{ color: theme.textPrimary, fontSize: 14, lineHeight: 20 }}>
+                  This is how a <Text style={{ backgroundColor: activeHighlightBg, fontWeight: 'bold' }}>highlighted word</Text> and the active line border look in the reader.
+                </Text>
+              </View>
+
+              <View style={styles.highlightRow}>
+                {highlightOptions.map((opt) => {
+                  const isSelected = highlightColor === opt.type;
+                  return (
+                    <TouchableOpacity
+                      key={opt.type}
+                      onPress={() => handleHighlightChange(opt.type, opt.label)}
+                      style={[
+                        styles.colorPill,
+                        {
+                          backgroundColor: opt.color,
+                          borderColor: isSelected ? theme.textPrimary : 'transparent',
+                          borderWidth: isSelected ? 2.5 : 0,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.colorPillText, { color: '#ffffff' }]}>
+                        {opt.label[0]}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
             {/* Lettering adjustments */}
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, { color: theme.accent }]}>Lettering & Spacing</Text>
+              
+              <View style={[styles.previewBox, { backgroundColor: theme.cardBackground }]}>
+                <Text
+                  style={{
+                    color: theme.textPrimary,
+                    fontSize: fontSize,
+                    lineHeight: fontSize * lineSpacing,
+                    letterSpacing: letterSpacing,
+                    fontFamily: fontOptions.find((opt) => opt.id === fontFamily)?.nativeName,
+                  }}
+                >
+                  "The quick brown fox jumps over the lazy dog."
+                </Text>
+              </View>
+
+              {/* Font Family Selector */}
+              <View style={styles.fontSelectorContainer}>
+                <Text style={[styles.fontSelectorLabel, { color: theme.textPrimary }]}>Font Style:</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.fontRow}>
+                  {fontOptions.map((opt) => {
+                    const isSelected = fontFamily === opt.id;
+                    return (
+                      <TouchableOpacity
+                        key={opt.id}
+                        onPress={() => handleFontChange(opt.id, opt.label)}
+                        style={[
+                          styles.fontPill,
+                          {
+                            backgroundColor: isSelected ? theme.accent : theme.cardBackground,
+                            borderColor: isSelected ? theme.accent : themeType === 'dark' ? '#333' : '#EAE6DB',
+                            borderWidth: 1,
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.fontPillText,
+                            {
+                              color: isSelected ? '#ffffff' : theme.textPrimary,
+                              fontFamily: opt.nativeName,
+                              fontWeight: isSelected ? 'bold' : 'normal',
+                            },
+                          ]}
+                        >
+                          {opt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
               
               {/* Font Size */}
               <View style={[styles.stepperRow, { backgroundColor: theme.cardBackground }]}>
@@ -241,14 +437,14 @@ export const SettingsModal: React.FC = () => {
                 <View style={styles.stepperControls}>
                   <TouchableOpacity
                     disabled={ttsSpeed <= minTtsSpeed}
-                    onPress={() => setTtsSpeed(Number((ttsSpeed - 0.1).toFixed(1)))}
+                    onPress={() => handleTtsSpeedChange(Number((ttsSpeed - 0.1).toFixed(1)))}
                     style={[styles.stepBtn, { backgroundColor: theme.accent }]}
                   >
                     <Text style={styles.stepBtnText}>-</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     disabled={ttsSpeed >= maxTtsSpeed}
-                    onPress={() => setTtsSpeed(Number((ttsSpeed + 0.1).toFixed(1)))}
+                    onPress={() => handleTtsSpeedChange(Number((ttsSpeed + 0.1).toFixed(1)))}
                     style={[styles.stepBtn, { backgroundColor: theme.accent }]}
                   >
                     <Text style={styles.stepBtnText}>+</Text>
@@ -262,53 +458,59 @@ export const SettingsModal: React.FC = () => {
                 <View style={styles.stepperControls}>
                   <TouchableOpacity
                     disabled={ttsPitch <= minTtsPitch}
-                    onPress={() => setTtsPitch(Number((ttsPitch - 0.1).toFixed(1)))}
+                    onPress={() => handleTtsPitchChange(Number((ttsPitch - 0.1).toFixed(1)))}
                     style={[styles.stepBtn, { backgroundColor: theme.accent }]}
                   >
                     <Text style={styles.stepBtnText}>-</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     disabled={ttsPitch >= maxTtsPitch}
-                    onPress={() => setTtsPitch(Number((ttsPitch + 0.1).toFixed(1)))}
+                    onPress={() => handleTtsPitchChange(Number((ttsPitch + 0.1).toFixed(1)))}
                     style={[styles.stepBtn, { backgroundColor: theme.accent }]}
                   >
                     <Text style={styles.stepBtnText}>+</Text>
                   </TouchableOpacity>
                 </View>
               </View>
+            </View>
 
-              {/* Highlight Color Selector */}
-              <View style={styles.colorSelectorContainer}>
-                <Text style={[styles.colorLabel, { color: theme.textPrimary }]}>Highlight Accent:</Text>
-                <View style={styles.highlightRow}>
-                  {highlightOptions.map((opt) => {
-                    const isSelected = highlightColor === opt.type;
-                    return (
-                      <TouchableOpacity
-                        key={opt.type}
-                        onPress={() => setHighlightColor(opt.type)}
-                        style={[
-                          styles.colorPill,
-                          {
-                            backgroundColor: opt.color,
-                            borderColor: isSelected ? theme.textPrimary : 'transparent',
-                            borderWidth: isSelected ? 2 : 0,
-                          },
-                        ]}
-                      >
-                        <Text style={[styles.colorPillText, { color: opt.type === 'theme' && themeType !== 'dark' ? '#fff' : '#fff' }]}>
-                          {opt.label[0]}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+            {/* Backend Connection */}
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: theme.accent }]}>Backend Connection</Text>
+              <View style={[styles.stepperRow, { backgroundColor: theme.cardBackground, flexDirection: 'column', alignItems: 'stretch', gap: 10, paddingVertical: 14 }]}>
+                <Text style={[styles.stepperLabel, { color: theme.textPrimary, fontSize: 13 }]}>
+                  Server API URL:
+                </Text>
+                <TextInput
+                  style={[
+                    styles.apiUrlInput,
+                    {
+                      color: theme.textPrimary,
+                      borderColor: theme.accent,
+                      backgroundColor: theme.background,
+                    }
+                  ]}
+                  value={apiUrl}
+                  onChangeText={setApiUrl}
+                  placeholder="http://localhost:8000"
+                  placeholderTextColor={theme.textSecondary}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <TouchableOpacity
+                  onPress={() => setApiUrl(getDefaultApiUrl())}
+                  style={[styles.resetUrlBtn, { backgroundColor: theme.accent }]}
+                >
+                  <Text style={styles.resetUrlBtnText}>Reset to Local Server</Text>
+                </TouchableOpacity>
               </View>
             </View>
 
           </ScrollView>
         </View>
       </View>
+
+      <ProfileModal visible={isProfileOpen} onClose={() => setIsProfileOpen(false)} />
     </Modal>
   );
 };
@@ -341,6 +543,13 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: '800',
+  },
+  previewBox: {
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
   },
   headerBtnRow: {
     flexDirection: 'row',
@@ -487,4 +696,84 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: 'bold',
   },
+  fontSelectorContainer: {
+    marginBottom: 16,
+    paddingHorizontal: 2,
+  },
+  fontSelectorLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  fontRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingVertical: 2,
+  },
+  fontPill: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  fontPillText: {
+    fontSize: 13,
+  },
+  apiUrlInput: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 13,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    marginTop: 4,
+  },
+  resetUrlBtn: {
+    paddingVertical: 8,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+  },
+  resetUrlBtnText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  // Profile card styles
+  profileCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 18,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.04)',
+  },
+  profileAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 2,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.04)',
+  },
+  profileAvatarImg: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+  },
+  profileInfo: { flex: 1 },
+  profileName: { fontSize: 16, fontWeight: '700' },
+  profileSub: { fontSize: 12, marginTop: 2 },
+  profileChevron: { fontSize: 24, fontWeight: '300' },
 });
