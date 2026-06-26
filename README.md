@@ -6,13 +6,13 @@
 
 ## Members:
 
-Christian Joshua Dela Cruz
+Christian Joshua Dela Cruz - Project Manager
 
-Mike Angelo Salamat
+Mike Angelo Salamat - Lead Developer
 
-Lucky Bulaqueña
+Lucky Bulaqueña - Multimedia Specialist
 
-Jonie Aguihap
+Jonie Aguihap - Lead Researcher
 
 ---
 
