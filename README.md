@@ -48,7 +48,7 @@ Run the project locally – Set up and run the project on your own machine. This
 
 ## Method 1: Install the .apk
 
-You can find here [] and install the .apk the hash is [].
+You can find here [https://expo.dev/accounts/christian2255/projects/belonged/builds/1fb6761b-993f-4d21-a8d4-d3862721f5e3](https://expo.dev/accounts/christian2255/projects/belonged/builds/1fb6761b-993f-4d21-a8d4-d3862721f5e3) and install the .apk.
 
 ## Method 2: Run the project locally
 
