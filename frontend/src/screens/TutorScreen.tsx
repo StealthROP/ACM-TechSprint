@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -30,6 +30,7 @@ export const TutorScreen: React.FC = () => {
   const theme = THEMES[themeType];
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const scrollViewRef = useRef<ScrollView>(null);
   const [chatMessages, setChatMessages] = useState<any[]>([
     {
       id: 1,
@@ -103,15 +104,22 @@ export const TutorScreen: React.FC = () => {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardView}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          
-          {/* Header */}
+        {/* Header - Fixed at Top */}
+        <View style={styles.headerContainer}>
           <View style={styles.header}>
             <Text style={[styles.headerSubtitle, { color: theme.accent }]}>BelongED AI TUTOR</Text>
             <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>Tutor Mode</Text>
           </View>
+        </View>
 
-          {/* Conversation Bubble List */}
+        {/* Scrollable Conversation List */}
+        <ScrollView 
+          ref={scrollViewRef}
+          style={styles.chatScroll}
+          contentContainerStyle={styles.scrollContent} 
+          showsVerticalScrollIndicator={true}
+          onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+        >
           <View style={styles.chatContainer}>
             {chatMessages.map((msg) => {
               const isAi = msg.sender === 'ai';
@@ -153,8 +161,10 @@ export const TutorScreen: React.FC = () => {
               );
             })}
           </View>
+        </ScrollView>
 
-          {/* Mock Input Form */}
+        {/* Mock Input Form - Fixed at Bottom */}
+        <View style={styles.inputContainer}>
           <View style={[styles.inputRow, { backgroundColor: theme.cardBackground }]}>
             <TextInput
               style={[styles.textInput, { color: theme.textPrimary }]}
@@ -167,8 +177,7 @@ export const TutorScreen: React.FC = () => {
               {isLoading ? <ActivityIndicator color="#fff" size="small" /> : <Feather name="send" size={14} color="#fff" />}
             </TouchableOpacity>
           </View>
-
-        </ScrollView>
+        </View>
 
         {/* Tab Bar */}
         <TabBar />
@@ -185,14 +194,23 @@ const styles = StyleSheet.create({
   keyboardView: {
     flex: 1,
   },
-  scrollContent: {
+  headerContainer: {
     paddingHorizontal: 24,
     paddingTop: 24,
+    paddingBottom: 4,
+  },
+  chatScroll: {
+    flex: 1,
+    width: '100%',
+  },
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingTop: 12,
     paddingBottom: 24,
     flexGrow: 1,
   },
   header: {
-    marginBottom: 20,
+    marginBottom: 0,
     width: '100%',
     maxWidth: 600,
     alignSelf: 'center',
@@ -240,6 +258,11 @@ const styles = StyleSheet.create({
   messageText: {
     fontSize: 14,
     lineHeight: 20,
+  },
+  inputContainer: {
+    paddingHorizontal: 24,
+    paddingBottom: 8,
+    width: '100%',
   },
   inputRow: {
     flexDirection: 'row',
