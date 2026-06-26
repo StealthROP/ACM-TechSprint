@@ -20,7 +20,7 @@ Jonie Aguihap
 
 Gemini: Used for code generation and idea clarification.
 
-ChatGPT: Used for reasoning support.
+ChatGPT: Used for editorial assistance to improve clarity, flow, and grammar.
 
 ## What we will develop?
 
