@@ -18,6 +18,8 @@ Jonie Aguihap
 
 ## AI Tools and Usage
 
+Antigravity: Used for code generation and correction.
+
 Gemini: Used for code generation and idea clarification.
 
 ChatGPT: Used for editorial assistance to improve clarity, flow, and grammar.
