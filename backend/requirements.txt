@@ -3,3 +3,4 @@ uvicorn
 pyphen
 google-generativeai
 python-dotenv
+python-multipart
