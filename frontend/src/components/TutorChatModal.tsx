@@ -23,6 +23,7 @@ import { Text } from './A11yText';
 import { useA11yStore } from '../store/useA11yStore';
 import { THEMES } from '../theme/themes';
 import { Feather } from '@expo/vector-icons';
+import { MOCK_LESSONS_BY_ID } from '../services/mockApi';
 
 export const TutorChatModal: React.FC = () => {
   const {
@@ -35,6 +36,9 @@ export const TutorChatModal: React.FC = () => {
     ttsPitch,
     highlightColor,
     fontFamily,
+    getAvailableMaterialsBrief,
+    dynamicLessons,
+    selectedMaterialId,
   } = useA11yStore();
   const theme = THEMES[themeType];
   const [inputText, setInputText] = useState('');
@@ -237,6 +241,9 @@ export const TutorChatModal: React.FC = () => {
         text: msg.text,
       }));
 
+      const briefList = getAvailableMaterialsBrief();
+      const currentLesson = dynamicLessons[selectedMaterialId] || MOCK_LESSONS_BY_ID[selectedMaterialId] || null;
+
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000);
 
@@ -248,6 +255,8 @@ export const TutorChatModal: React.FC = () => {
         },
         body: JSON.stringify({
           history: history,
+          available_materials: briefList,
+          current_material: currentLesson,
         }),
         signal: controller.signal,
       });

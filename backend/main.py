@@ -273,6 +273,8 @@ class ChatMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     history: List[ChatMessage]
+    available_materials: Optional[List[dict]] = None
+    current_material: Optional[dict] = None
 
 class ChatResponse(BaseModel):
     reply: str
@@ -318,6 +320,39 @@ async def chat_endpoint(request: ChatRequest):
             "4. When asked about the app, explain it accurately based on the mission and features above.\n"
             "5. Never call yourself 'AI Tutor' — you are BelongED."
         )
+
+        # Dynamic injection of study context
+        if request.available_materials:
+            system_prompt += "\n\nUSER'S LIBRARY OF STUDY MATERIALS:\n"
+            for idx, mat in enumerate(request.available_materials):
+                title = mat.get("title") or mat.get("document_title") or "Untitled Document"
+                mat_id = mat.get("id") or "N/A"
+                summary = mat.get("summary_snippet") or "No description available."
+                system_prompt += f"{idx+1}. Title: \"{title}\" (ID: {mat_id})\n"
+                system_prompt += f"   Summary: {summary}\n"
+            system_prompt += (
+                "\nWhen the user asks what study cards, documents, or learning materials they have in their library, "
+                "nicely list these titles and offer to help them study or summarize them."
+            )
+
+        if request.current_material:
+            curr_title = request.current_material.get("document_title") or "Selected Document"
+            curr_points = request.current_material.get("review_points") or []
+            
+            system_prompt += f"\n\nCURRENT ACTIVE STUDY MATERIAL (User is reading/viewing this right now):\n"
+            system_prompt += f"Title: \"{curr_title}\"\n"
+            
+            if curr_points:
+                system_prompt += "Summary Points from this material:\n"
+                # Pull the full sentences from the summary points
+                for p in curr_points[:5]:
+                    sentence = p.get("full_sentence") if isinstance(p, dict) else str(p)
+                    system_prompt += f"- {sentence}\n"
+            
+            system_prompt += (
+                "\nIf the user asks questions or wants explanations/quizzes about this specific active material, "
+                "use the summary points above to guide your responses. Help them learn these concepts in a simple and friendly way."
+            )
 
         # Format the chat history for Gemini API
         contents = []

@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { ThemeType } from '../theme/themes';
-import { LessonMaterial } from '../services/mockApi';
+import { LessonMaterial, MOCK_LESSONS_BY_ID } from '../services/mockApi';
 
 export const getDefaultApiUrl = () => {
   return 'https://belonged.onrender.com';
@@ -133,6 +133,7 @@ interface A11yState {
   startSession: () => void;
   endSession: () => void;
   touchStreak: () => void;           // call once per day to bump streak
+  getAvailableMaterialsBrief: () => Array<{ id: string; title: string; summary_snippet: string }>;
 }
 
 export const useA11yStore = create<A11yState>()(
@@ -294,6 +295,39 @@ export const useA11yStore = create<A11yState>()(
           const newStreak = state.lastActiveDate === yesterday ? state.streak + 1 : 1;
           return { streak: newStreak, lastActiveDate: today };
         }),
+      getAvailableMaterialsBrief: () => {
+        const state = useA11yStore.getState();
+        const custom = state.dynamicLessons || {};
+        const list: Array<{ id: string; title: string; summary_snippet: string }> = [];
+
+        // Preloaded template lessons
+        Object.keys(MOCK_LESSONS_BY_ID).forEach((id) => {
+          const lesson = MOCK_LESSONS_BY_ID[id];
+          const firstPoint = lesson.review_points?.[0]?.full_sentence || "";
+          const secondPoint = lesson.review_points?.[1]?.full_sentence || "";
+          const summary = [firstPoint, secondPoint].filter(Boolean).join(" ");
+          list.push({
+            id,
+            title: lesson.document_title,
+            summary_snippet: summary || "Template study guide.",
+          });
+        });
+
+        // User custom imported lessons
+        Object.keys(custom).forEach((id) => {
+          const lesson = custom[id];
+          const firstPoint = lesson.review_points?.[0]?.full_sentence || "";
+          const secondPoint = lesson.review_points?.[1]?.full_sentence || "";
+          const summary = [firstPoint, secondPoint].filter(Boolean).join(" ");
+          list.push({
+            id,
+            title: lesson.document_title,
+            summary_snippet: summary || "Custom study guide.",
+          });
+        });
+
+        return list;
+      },
     }),
     {
       name: 'a11y-user-profile-v7', // bumped for profile fields

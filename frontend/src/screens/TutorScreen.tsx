@@ -17,9 +17,16 @@ import { useA11yStore } from '../store/useA11yStore';
 import { THEMES } from '../theme/themes';
 import { TabBar } from '../components/TabBar';
 import { Feather } from '@expo/vector-icons';
+import { MOCK_LESSONS_BY_ID } from '../services/mockApi';
 
 export const TutorScreen: React.FC = () => {
-  const { themeType, apiUrl } = useA11yStore();
+  const { 
+    themeType, 
+    apiUrl, 
+    getAvailableMaterialsBrief, 
+    dynamicLessons, 
+    selectedMaterialId 
+  } = useA11yStore();
   const theme = THEMES[themeType];
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -54,8 +61,11 @@ export const TutorScreen: React.FC = () => {
         text: msg.text,
       }));
 
+      const briefList = getAvailableMaterialsBrief();
+      const currentLesson = dynamicLessons[selectedMaterialId] || MOCK_LESSONS_BY_ID[selectedMaterialId] || null;
+
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 seconds timeout for Render cold start
 
       const response = await fetch(url, {
         method: 'POST',
@@ -63,7 +73,11 @@ export const TutorScreen: React.FC = () => {
           'Content-Type': 'application/json',
           'Bypass-Tunnel-Reminder': 'true'
         },
-        body: JSON.stringify({ history }),
+        body: JSON.stringify({
+          history,
+          available_materials: briefList,
+          current_material: currentLesson,
+        }),
         signal: controller.signal,
       });
 
