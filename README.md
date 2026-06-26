@@ -16,6 +16,12 @@ Jonie Aguihap
 
 ---
 
+## AI Tools and Usage
+
+Gemini: Used for code generation and idea clarification.
+
+ChatGPT: Used for reasoning support.
+
 ## What we will develop?
 
 We are creating an AI-powered inclusive learning assistant designed to bridge the gap between traditional education systems and the diverse ways students learn. The platform provides personalized academic support for students with different learning needs, including those with dyslexia, autism, ADHD, and other learning differences, while still being beneficial for every learner. By combining artificial intelligence, accessibility tools, gamification, and adaptive learning, the system transforms educational content into a more understandable, engaging, and personalized experience. Instead of forcing students to adapt to a single learning method, our platform adapts to the student by adjusting reading formats, learning pace, communication style, and study environment based on their individual needs.
