@@ -6,7 +6,7 @@ import { ThemeType } from '../theme/themes';
 import { LessonMaterial } from '../services/mockApi';
 
 export const getDefaultApiUrl = () => {
-  return 'https://belonged-sprint-api.loca.lt';
+  return 'https://belonged.onrender.com';
 };
 
 // Returns today's date string in YYYY-MM-DD format (local)
@@ -304,6 +304,7 @@ export const useA11yStore = create<A11yState>()(
           state.apiUrl &&
           (state.apiUrl.includes('10.0.2.2') ||
             state.apiUrl.includes('localhost') ||
+            state.apiUrl.includes('loca.lt') ||
             state.apiUrl === 'https://belong-backend-api.loca.lt' ||
             state.apiUrl === 'https://belonged-backend-api.loca.lt')
         ) {
